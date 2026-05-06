@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ----------------------------------------------------------------------------------------------------------*/
 #include "lpbam_i2c_spec.h"
+#include "main.h"
 
 /* Private variables -------------------------------------------------------------------------------------------------*/
 /* LPBAM variables declaration */
@@ -46,7 +47,11 @@ DMA_QListTypeDef I2CAcq_Q;
 
 /* External variables ------------------------------------------------------------------------------------------------*/
 /* USER CODE BEGIN EV */
+/* DICHIARAZIONI - Servono per "vedere" le variabili definite altrove */
 
+extern uint8_t AS7341_start_register;
+extern uint8_t AS7341_Rx_Buffer[12];
+extern uint8_t DataBufferOffset;
 /* USER CODE END EV */
 
 /* Private function prototypes ---------------------------------------------------------------------------------------*/
@@ -99,10 +104,10 @@ static void MX_I2CAcq_Q_Build(void)
     */
    pDMAListInfo_I2C.QueueType= LPBAM_LINEAR_ADDRESSING_Q;
    pDMAListInfo_I2C.pInstance= LPDMA1;
-  pTxData_I2C.AutoModeConf.TriggerState = LPBAM_I2C_AUTO_MODE_DISABLE;
+   pTxData_I2C.AutoModeConf.TriggerState = LPBAM_I2C_AUTO_MODE_DISABLE;
    pTxData_I2C.AddressingMode = LPBAM_I2C_ADDRESSINGMODE_7BIT;
    pTxData_I2C.SequenceNumber = 1;
-   pTxData_I2C.pData = (uint8_t*)&AS7341_start_register[DataBufferOffset];
+   pTxData_I2C.pData = (uint8_t*)&AS7341_start_register;
    pTxData_I2C.DevAddress = 0x95;
    pTxData_I2C.Size = 1;
   /* Set transfer parameters */

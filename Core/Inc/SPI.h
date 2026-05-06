@@ -37,7 +37,7 @@ extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
 
 /* USER CODE BEGIN Private defines */
-
+#define SPI_TIMEOUT 10
 /* USER CODE END Private defines */
 
 void MX_SPI2_Init(void);

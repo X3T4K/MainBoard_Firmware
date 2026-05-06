@@ -67,13 +67,20 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-I2C_HandleTypeDef hi2c3;
-DMA_HandleTypeDef handle_LPDMA1_Channel0;
-LPTIM_HandleTypeDef hlptim1;
+extern I2C_HandleTypeDef hi2c3;
+extern DMA_HandleTypeDef handle_LPDMA1_Channel0;
+extern LPTIM_HandleTypeDef hlptim1;
 
 /* USER CODE BEGIN PV */
-int AS7341_start_register = 0x95; // Starting register for AS7341 data
-uint8_t AS7341_Rx_Buffer[12]; // Buffer to hold raw data read from AS7341 (6 channels x 2 bytes each)
+
+// Registro di partenza (Nota: meglio uint8_t per registri I2C)
+uint8_t AS7341_start_register = 0x95; 
+
+// Buffer in SRAM4 per LPBAM/DMA
+uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4"))); 
+
+// Offset per la gestione dei dati
+uint8_t DataBufferOffset = 0;
 // --- State Machine ---
 // The current state of the application. Initial state is IDLE.
 static AppState current_state = STATE_IDLE;
