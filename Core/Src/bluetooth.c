@@ -284,6 +284,26 @@ uint8_t BLE_IsConnected(void) {
     return 0; // Non connesso
 }
 
+/**
+ * @brief Riceve e interpreta un comando BLE dall'app.
+ *
+ * Questa funzione legge un comando inviato dall'app tramite BLE e lo interpreta.
+ * Se il comando è "START_TRANSFER", avvia il trasferimento dei dati.
+ */
+void BLE_ProcessStartCommand(void) {
+    uint8_t command_buffer[20] = {0}; // Buffer per il comando ricevuto
+
+    // Ricevi il comando dall'app
+    BLE_ReceiveData(command_buffer, sizeof(command_buffer));
+
+    // Confronta il comando ricevuto con "START_TRANSFER"
+    if (strncmp((char *)command_buffer, "START_TRANSFER", strlen("START_TRANSFER")) == 0) {
+        // Cambia lo stato della macchina a stati per avviare il trasferimento
+        current_state = STATE_TRANSFER;
+    }
+}
+
+
 // --- Helper Function Implementations ---
 // These helper functions encapsulate common, repeated tasks to improve code clarity.
 

@@ -272,6 +272,11 @@ int main(void)
 			    current_state = STATE_USB_CONNECTED;
 	  		break;
 
+        case STATE_TRANSFER:
+            // Invia i dati per il grafico
+            send_data_to_app();
+        break;
+
 	  }
   }
   /* USER CODE END 3 */
