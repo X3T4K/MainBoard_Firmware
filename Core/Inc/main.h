@@ -98,7 +98,8 @@ typedef enum {
     STATE_IDLE,          // The device is waiting for a command or event.
     STATE_ACQUISITION,   // The device is actively collecting sensor data.
     STATE_USB_CONNECTED, // The device is connected to a computer via USB.
-    STATE_DOWNLOAD       // The device is in the process of downloading data.
+    STATE_DOWNLOAD,       // The device is in the process of downloading data.
+    STATE_TRANSFER      // The device is transferring data to the app via BLE.
 } AppState;
 /* USER CODE END Private defines */
 

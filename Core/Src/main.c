@@ -274,7 +274,7 @@ int main(void)
 
         case STATE_TRANSFER:
             // Invia i dati per il grafico
-            send_data_to_app();
+            //send_data_to_app();
         break;
 
 	  }

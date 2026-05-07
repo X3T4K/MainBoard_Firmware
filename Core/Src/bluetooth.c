@@ -23,6 +23,7 @@
 #include "main.h"
 
 extern UART_HandleTypeDef huart3;
+extern AppState current_state;
 
 // --- Helper Functions (Internal to this file) ---
 // These functions are not meant to be called directly by the user.
