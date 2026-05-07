@@ -73,8 +73,10 @@ extern LPTIM_HandleTypeDef hlptim1;
 
 /* USER CODE BEGIN PV */
 
+uint8_t AS7341_start_register = 0x95;
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
-uint8_t AS7341_start_register = 0x95; 
+
+
 
 // Buffer in SRAM4 per LPBAM/DMA
 uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4"))); 
