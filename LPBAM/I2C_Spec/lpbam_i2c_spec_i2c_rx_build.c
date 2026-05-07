@@ -108,7 +108,7 @@ static void MX_I2CAcq_Q_Build(void)
    pTxData_I2C.AddressingMode = LPBAM_I2C_ADDRESSINGMODE_7BIT;
    pTxData_I2C.SequenceNumber = 1;
    pTxData_I2C.pData = (uint8_t*)&AS7341_start_register;
-   pTxData_I2C.DevAddress = 0x95;
+   pTxData_I2C.DevAddress = 0x39; // il registro I2C del sensore AS7341 è 0x39
    pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
