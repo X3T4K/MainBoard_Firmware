@@ -73,13 +73,15 @@ extern LPTIM_HandleTypeDef hlptim1;
 
 /* USER CODE BEGIN PV */
 
-uint8_t AS7341_start_register = 0x95;
+//uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
+uint8_t AS7341_start_register = 0x93; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
 
 
 
 // Buffer in SRAM4 per LPBAM/DMA
 uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4"))); 
+__attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[12]; // Buffer per i dati letti dal sensore, posizionato in SRAM4 con retention
 
 // Offset per la gestione dei dati
 uint8_t DataBufferOffset = 0;

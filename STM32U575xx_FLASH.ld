@@ -53,6 +53,14 @@ _Min_Stack_Size = 0x800; /* required amount of stack */
 /* Sections */
 SECTIONS
 {
+  /* Sezione dedicata ai dati da trattenere in Stop 2 */
+  .sram4_retention (NOLOAD) :
+  {
+    . = ALIGN(4);
+    *(.sram4_retention)
+    . = ALIGN(4);
+  } > SRAM4
+
   /* The startup code into "ROM" Rom type memory */
   .isr_vector :
   {
