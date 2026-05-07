@@ -180,6 +180,7 @@ int main(void)
   LED_On(LED_RED);
 
   // Initialize all hardware peripherals (ble, usb, nand flash, imu)
+  //da rimuovere fuori debug, perchè all'accensione del dispositivo non è necessario inizializzare il bluetooth e la USB, ma solo quando si preme il bottone per scaricare i dati
   BLE_Initialize();
   MX_USB_Device_Init();
   HAL_Delay(1000);
@@ -221,7 +222,7 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
   HAL_DBGMCU_DisableDBGStopMode();
   __HAL_RCC_PWR_CLK_ENABLE();
-  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); //wake up only when there is an interupt
+  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); //entra in stop mode
 
 
   /* USER CODE END 2 */
@@ -234,45 +235,44 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-		//LED_Toggle(LED_GREEN);
-		//HAL_Delay(1000);
+		LED_On(LED_GREEN); //così vediamo che si risveglia dallo stop mode, poi si spegne dopo 2 secondi
+		HAL_Delay(2000);
+		LED_Off(LED_GREEN);
 
 	  switch(current_state)
 	  {
 	  	  case STATE_IDLE:
-	  		// Check if a USB connection has been detected
-	  		if(!usb_flag)
-		    {
-	  			//MX_USB_Device_Init();
-		    }
-	  		else
-	  		{
-			   // Transition to the USB_CONNECTED state
-	  		   current_state = STATE_USB_CONNECTED;
-			   // Green LED on upon USB Connection
-			   LED_On(LED_GREEN);
-		    }
-	  		break;
+          // Check if a USB connection has been detected
+          if(!usb_flag){
+            //MX_USB_Device_Init();
+          }
+          else{
+          // Transition to the USB_CONNECTED state
+          current_state = STATE_USB_CONNECTED;
+          // Green LED on upon USB Connection
+          LED_On(LED_GREEN);
+          }
+          
+        break;
 
 	  	  case STATE_ACQUISITION:
-	  		   // All data acquisition is handled by the timer interrupt
+	  		  // All data acquisition is handled by the timer interrupt
 
-			break;
+			  break;
 
 	  	  case STATE_USB_CONNECTED:
 	  		break;
 
 	  	  case STATE_DOWNLOAD:
 
-	  		   // This state manages reading data blocks and sending them via USB.
+	  		  // This state manages reading data blocks and sending them via USB.
 	  		  // Once download is complete, the state returns to USB_CONNECTED.
 	  		  // Read data packets from memory
 	  		  read_memory_and_transmit();
+			    current_state = STATE_USB_CONNECTED;
+	  		break;
 
-			 current_state = STATE_USB_CONNECTED;
-	  		 break;
 	  }
-
   }
   /* USER CODE END 3 */
 }
@@ -351,7 +351,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
         // Send the accelerometer and gyroscope data via BLE
         // We are sending only the X-axis data
-        BLE_SendPacket(DATA_TYPE_IMU_ACCELERATION, raw_accelerometer);
+        if(BLE_IsConnected()) {
+            BLE_SendPacket(DATA_TYPE_IMU_ACCELERATION, raw_accelerometer);
+        }
         //TODO: Change Gyro function
         //BLE_SendPacket(DATA_TYPE_IMU_GYROSCOPE, (uint32_t)gyroscope_data.x);
 

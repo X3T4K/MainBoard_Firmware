@@ -259,6 +259,31 @@ void BLE_SendPacket(BLE_DataType ble_data_type, uint8_t* data_buffer) {
     BLE_SendData(ble_packet, sizeof(ble_packet));
 }
 
+/**
+ * @brief Verifica se il modulo BLE è connesso a un dispositivo.
+ *
+ * Questa funzione invia il comando "GK" al modulo RN4871 per verificare lo stato della connessione.
+ * @retval 1 Se il modulo è connesso.
+ * @retval 0 Se il modulo non è connesso.
+ */
+uint8_t BLE_IsConnected(void) {
+    uint8_t connection_status_command[] = "GK\r";
+    uint8_t response[2] = {0};
+
+    // Invia il comando per verificare lo stato della connessione
+    BLE_SendData(connection_status_command, sizeof(connection_status_command) - 1);
+
+    // Ricevi la risposta dal modulo BLE
+    HAL_UART_Receive(&huart3, response, sizeof(response), UART_TIMEOUT);
+
+    // Controlla la risposta: '1' indica che il modulo è connesso
+    if (response[0] == '1') {
+        return 1; // Connesso
+    }
+
+    return 0; // Non connesso
+}
+
 // --- Helper Function Implementations ---
 // These helper functions encapsulate common, repeated tasks to improve code clarity.
 
