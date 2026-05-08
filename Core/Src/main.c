@@ -67,10 +67,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-extern I2C_HandleTypeDef hi2c3;
-extern DMA_HandleTypeDef handle_LPDMA1_Channel0;
-extern LPTIM_HandleTypeDef hlptim1;
-
+I2C_HandleTypeDef hi2c3;
+DMA_HandleTypeDef handle_LPDMA1_Channel0;
+LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
