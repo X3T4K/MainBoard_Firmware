@@ -45,6 +45,8 @@
 #include "led_driver.h"
 #include "imu_driver.h"
 #include "bluetooth.h"
+#include "Spec_AS7341.h"
+
 
 /* USER CODE END Includes */
 
@@ -79,11 +81,9 @@ uint8_t AS7341_start_register = 0x93; //inizio a leggere da STATUS, mi serve AST
 
 
 // Buffer in SRAM4 per LPBAM/DMA
-uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4"))); 
-__attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[12]; // Buffer per i dati letti dal sensore, posizionato in SRAM4 con retention
-
-// Offset per la gestione dei dati
-uint8_t DataBufferOffset = 0;
+__attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[240]; // Buffer per i dati luce blu
+uint8_t DataBufferOffset = 0; // Offset per leggere i dati luce blu (CH0-CH5) dopo i primi 3 byte di STATUS, ASTATUS e GAIN
+__attribute__((section(".sram4_retention"))) uint8_t Flicke_buffer[20]; // Buffer per i dati del flicker
 // --- State Machine ---
 // The current state of the application. Initial state is IDLE.
 static AppState current_state = STATE_IDLE;
