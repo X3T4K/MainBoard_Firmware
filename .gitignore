@@ -1,3 +1,7 @@
 build
 mx.scratch
 !.settings
+
+# Ambienti virtuali Python
+venv/
+.venv/

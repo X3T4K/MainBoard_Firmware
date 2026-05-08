@@ -56,6 +56,7 @@
 
 /* External variables --------------------------------------------------------*/
 extern MDF_HandleTypeDef MdfHandle0;
+extern MDF_HandleTypeDef MdfHandle1;
 extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
 extern TIM_HandleTypeDef htim2;

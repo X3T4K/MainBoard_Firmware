@@ -26,6 +26,9 @@
 
 MDF_HandleTypeDef MdfHandle0;
 MDF_FilterConfigTypeDef MdfFilterConfig0;
+MDF_HandleTypeDef MdfHandle1;
+MDF_FilterConfigTypeDef MdfFilterConfig1;
+MDF_ScdConfigTypeDef mdfScdConfig1;
 
 /* MDF1 init function */
 void MX_MDF1_Init(void)
@@ -76,13 +79,55 @@ void MX_MDF1_Init(void)
   MdfFilterConfig0.ReshapeFilter.DecimationRatio = MDF_RSF_DECIMATION_RATIO_4;
   MdfFilterConfig0.HighPassFilter.Activation = ENABLE;
   MdfFilterConfig0.HighPassFilter.CutOffFrequency = MDF_HPF_CUTOFF_0_000625FPCM;
-  MdfFilterConfig0.Integrator.Activation = DISABLE;
+  MdfFilterConfig0.Integrator.Activation = ENABLE;
+  MdfFilterConfig0.Integrator.Value = 2;
+  MdfFilterConfig0.Integrator.OutputDivision = MDF_INTEGRATOR_OUTPUT_DIV_128;
   MdfFilterConfig0.SoundActivity.Activation = DISABLE;
   MdfFilterConfig0.AcquisitionMode = MDF_MODE_SYNC_CONT;
   MdfFilterConfig0.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
   MdfFilterConfig0.DiscardSamples = 255;
   MdfFilterConfig0.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
   MdfFilterConfig0.Trigger.Edge = MDF_FILTER_TRIG_RISING_EDGE;
+
+  /**
+    MdfHandle1 structure initialization and HAL_MDF_Init function call
+  */
+  MdfHandle1.Instance = MDF1_Filter1;
+  MdfHandle1.Init.CommonParam.InterleavedFilters = 0;
+  MdfHandle1.Init.CommonParam.ProcClockDivider = 1;
+  MdfHandle1.Init.CommonParam.OutputClock.Activation = ENABLE;
+  MdfHandle1.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
+  MdfHandle1.Init.CommonParam.OutputClock.Divider = 5;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_FALLING_EDGE;
+  MdfHandle1.Init.SerialInterface.Activation = DISABLE;
+  if (HAL_MDF_Init(&MdfHandle1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /**
+    MdfFilterConfig1, MdfOldConfig1 and/or MdfScdConfig1 structures initialization
+
+    WARNING : only structures are filled, no specific init function call for filter
+  */
+  MdfFilterConfig1.DataSource = MDF_DATA_SOURCE_BSMX;
+  MdfFilterConfig1.Delay = 0;
+  MdfFilterConfig1.CicMode = MDF_TWO_FILTERS_MCIC_SINC3;
+  MdfFilterConfig1.DecimationRatio = 32;
+  MdfFilterConfig1.Offset = 0;
+  MdfFilterConfig1.Gain = 0;
+  MdfFilterConfig1.ReshapeFilter.Activation = DISABLE;
+  MdfFilterConfig1.HighPassFilter.Activation = DISABLE;
+  MdfFilterConfig1.Integrator.Activation = ENABLE;
+  MdfFilterConfig1.Integrator.Value = 2;
+  MdfFilterConfig1.Integrator.OutputDivision = MDF_INTEGRATOR_OUTPUT_DIV_32;
+  MdfFilterConfig1.AcquisitionMode = MDF_MODE_ASYNC_CONT;
+  MdfFilterConfig1.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
+  MdfFilterConfig1.DiscardSamples = 0;
+  mdfScdConfig1.Threshold = 20;
+  mdfScdConfig1.BreakSignal = MDF_NO_BREAK_SIGNAL;
   /* USER CODE BEGIN MDF1_Init 2 */
 
   /* USER CODE END MDF1_Init 2 */
