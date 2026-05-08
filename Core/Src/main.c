@@ -77,7 +77,7 @@ LPTIM_HandleTypeDef hlptim1;
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
 uint8_t AS7341_start_register = 0x93; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
-
+uint8_t Flicker_REG = 0xDB;
 
 
 // Buffer in SRAM4 per LPBAM/DMA
