@@ -37,6 +37,10 @@ void MX_LPDMA1_Init(void)
   /* Peripheral clock enable */
   __HAL_RCC_LPDMA1_CLK_ENABLE();
 
+  /* LPDMA1 interrupt Init */
+    HAL_NVIC_SetPriority(LPDMA1_Channel0_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(LPDMA1_Channel0_IRQn);
+
   /* USER CODE BEGIN LPDMA1_Init 1 */
 
   /* USER CODE END LPDMA1_Init 1 */

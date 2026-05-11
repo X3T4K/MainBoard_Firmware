@@ -26,7 +26,7 @@
 /* USER CODE END PTD */
 
 /* Private define --------------------------------------------------------------------------------------------------*/
-#define I2CACQ_Q_IDX (0U)
+#define BLUE_FLICK_ACQ_Q_IDX (0U)
 #define DMA_TIMEOUT_DURATION (0x1000U)
 
 /* USER CODE BEGIN PD */
@@ -45,7 +45,7 @@ extern DMA_HandleTypeDef handle_LPDMA1_Channel0;
 extern LPTIM_HandleTypeDef hlptim1;
 
 /* LPBAM queues declaration */
-extern DMA_QListTypeDef I2CAcq_Q;
+extern DMA_QListTypeDef Blue_Flick_Acq_Q;
 
 /* USER CODE BEGIN EV */
 
@@ -73,8 +73,13 @@ static void MX_AutonomousMode_Init(void);
 static void MX_AutonomousMode_DeInit(void);
 
 /* LPBAM queue linking/unlinking APIs */
-static void MX_I2CAcq_Q_Link(DMA_HandleTypeDef *hdma);
-static void MX_I2CAcq_Q_UnLink(DMA_HandleTypeDef *hdma);
+static void MX_Blue_Flick_Acq_Q_Link(DMA_HandleTypeDef *hdma);
+static void MX_Blue_Flick_Acq_Q_UnLink(DMA_HandleTypeDef *hdma);
+
+/* LPBAM DMA user callback APIs */
+static void MX_Blue_Flick_Acq_Q_DMA_TC_Callback(DMA_HandleTypeDef *hdma);
+/* LPBAM DMA NVIC API */
+static void MX_DMA_NVIC_Config(DMA_HandleTypeDef *hdma, uint32_t PreemptPriority, uint32_t SubPriority);
 
 /* USER CODE BEGIN PFP */
 
@@ -137,12 +142,12 @@ void MX_I2C_Spec_I2C_RX_Link(DMA_HandleTypeDef *hdma)
 
   /* USER CODE END I2C_Spec_I2C_RX_Link 0 */
 
-  /* Link I2CAcq queue to DMA channel */
-  MX_I2CAcq_Q_Link(&hdma[I2CACQ_Q_IDX]);
+  /* Link Blue_Flick_Acq queue to DMA channel */
+  MX_Blue_Flick_Acq_Q_Link(&hdma[BLUE_FLICK_ACQ_Q_IDX]);
 
-  /* USER CODE BEGIN LINK I2CACQ_Q_IDX */
+  /* USER CODE BEGIN LINK BLUE_FLICK_ACQ_Q_IDX */
 
-  /* USER CODE END LINK I2CACQ_Q_IDX */
+  /* USER CODE END LINK BLUE_FLICK_ACQ_Q_IDX */
 
   /* USER CODE BEGIN I2C_Spec_I2C_RX_Link 1 */
 
@@ -161,12 +166,12 @@ void MX_I2C_Spec_I2C_RX_UnLink(DMA_HandleTypeDef *hdma)
 
   /* USER CODE END I2C_Spec_I2C_RX_UnLink 0 */
 
-  /* LPBAM unLink I2CAcq queue to DMA channel */
-  MX_I2CAcq_Q_UnLink(&hdma[I2CACQ_Q_IDX]);
+  /* LPBAM unLink Blue_Flick_Acq queue to DMA channel */
+  MX_Blue_Flick_Acq_Q_UnLink(&hdma[BLUE_FLICK_ACQ_Q_IDX]);
 
-  /* USER CODE BEGIN UNLINK I2CACQ_Q_IDX */
+  /* USER CODE BEGIN UNLINK BLUE_FLICK_ACQ_Q_IDX */
 
-  /* USER CODE END UNLINK I2CACQ_Q_IDX */
+  /* USER CODE END UNLINK BLUE_FLICK_ACQ_Q_IDX */
 
   /* USER CODE BEGIN I2C_Spec_I2C_RX_UnLink 1 */
 
@@ -180,7 +185,7 @@ void MX_I2C_Spec_I2C_RX_UnLink(DMA_HandleTypeDef *hdma)
 void MX_I2C_Spec_I2C_RX_Start(DMA_HandleTypeDef *hdma)
 {
   /* LPBAM start DMA channel in linked-list mode */
-  if (HAL_DMAEx_List_Start(&hdma[I2CACQ_Q_IDX]) != HAL_OK)
+  if (HAL_DMAEx_List_Start(&hdma[BLUE_FLICK_ACQ_Q_IDX]) != HAL_OK)
   {
     Error_Handler();
   }
@@ -197,18 +202,18 @@ void MX_I2C_Spec_I2C_RX_Start(DMA_HandleTypeDef *hdma)
 void MX_I2C_Spec_I2C_RX_Stop(DMA_HandleTypeDef *hdma)
 {
   /* LPBAM stop DMA channel in linked-list mode */
-  if ((hdma[I2CACQ_Q_IDX].State == HAL_DMA_STATE_BUSY) && (hdma[I2CACQ_Q_IDX].LinkedListQueue->FirstCircularNode != 0U))
+  if ((hdma[BLUE_FLICK_ACQ_Q_IDX].State == HAL_DMA_STATE_BUSY) && (hdma[BLUE_FLICK_ACQ_Q_IDX].LinkedListQueue->FirstCircularNode != 0U))
   {
-    if (HAL_DMA_Abort(&hdma[I2CACQ_Q_IDX]) != HAL_OK)
+    if (HAL_DMA_Abort(&hdma[BLUE_FLICK_ACQ_Q_IDX]) != HAL_OK)
     {
       Error_Handler();
     }
   }
 
   /* Check if DMA channel interrupt is enabled */
-  if ((hdma[I2CACQ_Q_IDX].State == HAL_DMA_STATE_BUSY) && (__HAL_DMA_GET_IT_SOURCE(&hdma[I2CACQ_Q_IDX], DMA_IT_TC) == 0U))
+  if ((hdma[BLUE_FLICK_ACQ_Q_IDX].State == HAL_DMA_STATE_BUSY) && (__HAL_DMA_GET_IT_SOURCE(&hdma[BLUE_FLICK_ACQ_Q_IDX], DMA_IT_TC) == 0U))
   {
-    if (HAL_DMA_PollForTransfer(&hdma[I2CACQ_Q_IDX], HAL_DMA_FULL_TRANSFER, DMA_TIMEOUT_DURATION) != HAL_OK)
+    if (HAL_DMA_PollForTransfer(&hdma[BLUE_FLICK_ACQ_Q_IDX], HAL_DMA_FULL_TRANSFER, DMA_TIMEOUT_DURATION) != HAL_OK)
     {
       Error_Handler();
     }
@@ -535,9 +540,9 @@ static void MX_LPTIM1_Init(void)
   }
   hlptim1.Instance = LPTIM1;
   hlptim1.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
-  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV32;
+  hlptim1.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
   hlptim1.Init.Trigger.Source = LPTIM_TRIGSOURCE_SOFTWARE;
-  hlptim1.Init.Period = 2047;
+  hlptim1.Init.Period = 31999;
   hlptim1.Init.UpdateMode = LPTIM_UPDATE_IMMEDIATE;
   hlptim1.Init.CounterSource = LPTIM_COUNTERSOURCE_INTERNAL;
   hlptim1.Init.Input1Source = LPTIM_INPUT1SOURCE_GPIO;
@@ -547,7 +552,7 @@ static void MX_LPTIM1_Init(void)
   {
     Error_Handler();
   }
-  sConfig1.Pulse = 0;
+  sConfig1.Pulse = 160;
   sConfig1.OCPolarity = LPTIM_OCPOLARITY_HIGH;
   if (HAL_LPTIM_OC_ConfigChannel(&hlptim1, &sConfig1, LPTIM_CHANNEL_1) != HAL_OK)
   {
@@ -611,7 +616,7 @@ static void MX_LPTIM1_MspInit(LPTIM_HandleTypeDef* lptimHandle)
   /** Initializes the peripherals clock
   */
     PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_LPTIM1;
-    PeriphClkInit.Lptim1ClockSelection = RCC_LPTIM1CLKSOURCE_LSE;
+    PeriphClkInit.Lptim1ClockSelection = RCC_LPTIM1CLKSOURCE_LSI;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
     {
       Error_Handler();
@@ -646,10 +651,10 @@ static void MX_LPTIM1_MspDeInit(LPTIM_HandleTypeDef* lptimHandle)
 }
 
 /**
-  * @brief  I2CAcq queue link
+  * @brief  Blue_Flick_Acq queue link
   * @retval None
   */
-static void MX_I2CAcq_Q_Link(DMA_HandleTypeDef *hdma)
+static void MX_Blue_Flick_Acq_Q_Link(DMA_HandleTypeDef *hdma)
 {
   /* Enable LPDMA1 clock */
   __HAL_RCC_LPDMA1_CLK_ENABLE();
@@ -662,22 +667,34 @@ static void MX_I2CAcq_Q_Link(DMA_HandleTypeDef *hdma)
   {
     Error_Handler();
   }
-  if (HAL_DMAEx_List_LinkQ(hdma, &I2CAcq_Q) != HAL_OK)
+  if (HAL_DMAEx_List_LinkQ(hdma, &Blue_Flick_Acq_Q) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  __HAL_DMA_ENABLE_IT(hdma, DMA_IT_TC);
+
+  /* Register DMA channel error callbacks */
+  if (HAL_DMA_RegisterCallback(hdma, HAL_DMA_XFER_CPLT_CB_ID, MX_Blue_Flick_Acq_Q_DMA_TC_Callback) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  MX_DMA_NVIC_Config(hdma, 0, 0);
+}
+
+/**
+  * @brief  Blue_Flick_Acq queue unlink
+  * @retval None
+  */
+static void MX_Blue_Flick_Acq_Q_UnLink(DMA_HandleTypeDef *hdma)
+{
+  /* UnLink Blue_Flick_Acq queue to DMA channel */
+  if (HAL_DMAEx_List_UnLinkQ(hdma) != HAL_OK)
   {
     Error_Handler();
   }
 
-  /* Register DMA channel error callbacks */
-}
-
-/**
-  * @brief  I2CAcq queue unlink
-  * @retval None
-  */
-static void MX_I2CAcq_Q_UnLink(DMA_HandleTypeDef *hdma)
-{
-  /* UnLink I2CAcq queue to DMA channel */
-  if (HAL_DMAEx_List_UnLinkQ(hdma) != HAL_OK)
+  /* Register DMA channel transfer complete callbacks */
+  if (HAL_DMA_UnRegisterCallback(hdma, HAL_DMA_XFER_CPLT_CB_ID) != HAL_OK)
   {
     Error_Handler();
   }
@@ -689,7 +706,58 @@ static void MX_I2CAcq_Q_UnLink(DMA_HandleTypeDef *hdma)
   }
 }
 
+/**
+  * @brief  Blue_Flick_Acq queue dma transfer complete callbacks
+  * @retval None
+  */
+static void MX_Blue_Flick_Acq_Q_DMA_TC_Callback(DMA_HandleTypeDef *hdma)
+{
+  /* USER CODE BEGIN Blue_Flick_Acq_DMA_TC_Callback */
+
+  /* USER CODE END Blue_Flick_Acq_DMA_TC_Callback */
+}
+
 /* USER CODE BEGIN I2C_Spec_I2C_RX_Config */
 
 /* USER CODE END I2C_Spec_I2C_RX_Config */
 
+/**
+  * @brief DMA channel NVIC configuration
+  * @retval None
+  */
+static void MX_DMA_NVIC_Config(DMA_HandleTypeDef *hdma, uint32_t PreemptPriority, uint32_t SubPriority)
+{
+  IRQn_Type irq = LPDMA1_Channel0_IRQn;
+
+  /* Check DMA channel instance */
+  switch ((uint32_t)hdma->Instance)
+  {
+    case (uint32_t)LPDMA1_Channel0: /* DMA channel_0 */
+    {
+      irq = LPDMA1_Channel0_IRQn;
+      break;
+    }
+
+    case (uint32_t)LPDMA1_Channel1: /* DMA channel_1 */
+    {
+      irq = LPDMA1_Channel1_IRQn;
+      break;
+    }
+
+    case (uint32_t)LPDMA1_Channel2: /* DMA channel_2 */
+    {
+      irq = LPDMA1_Channel2_IRQn;
+      break;
+    }
+
+    case (uint32_t)LPDMA1_Channel3: /* DMA channel_3 */
+    {
+      irq = LPDMA1_Channel3_IRQn;
+      break;
+    }
+  }
+
+  /* Enable NVIC for DMA channel */
+  HAL_NVIC_SetPriority(irq, PreemptPriority, SubPriority);
+  HAL_NVIC_EnableIRQ(irq);
+}
