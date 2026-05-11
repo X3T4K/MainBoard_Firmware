@@ -28,6 +28,7 @@
 #include "lpdma.h"
 #include "lptim.h"
 #include "mdf.h"
+#include "rtc.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -172,6 +173,7 @@ int main(void)
   MX_LPTIM1_Init();
   MX_ICACHE_Init();
   MX_MDF1_Init();
+  MX_RTC_Init();
   MX_SPI2_Init();
   MX_SPI3_Init();
   MX_TIM2_Init();
