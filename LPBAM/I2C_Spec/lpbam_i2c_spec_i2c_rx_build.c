@@ -144,7 +144,7 @@ DMA_QListTypeDef I2CAcq_Q;
 /* DICHIARAZIONI - Servono per "vedere" le variabili definite altrove */
 
 extern uint8_t AS7341_start_register;
-extern uint8_t AS7341_Rx_Buffer[240];
+extern uint8_t AS7341_Rx_Buffer[60];
 extern uint8_t DataBufferOffset;
 /* USER CODE END EV */
 

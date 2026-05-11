@@ -81,9 +81,9 @@ uint8_t Flicker_REG = 0xDB;
 
 
 // Buffer in SRAM4 per LPBAM/DMA
-__attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[240]; // Buffer per i dati luce blu
+__attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[60]; // Buffer per i dati luce blu
 uint8_t DataBufferOffset = 0; // Offset per leggere i dati luce blu (CH0-CH5) dopo i primi 3 byte di STATUS, ASTATUS e GAIN
-__attribute__((section(".sram4_retention"))) uint8_t Flicke_buffer[20]; // Buffer per i dati del flicker
+__attribute__((section(".sram4_retention"))) uint8_t Flicke_buffer[5]; // Buffer per i dati del flicker
 // --- State Machine ---
 // The current state of the application. Initial state is IDLE.
 static AppState current_state = STATE_IDLE;
