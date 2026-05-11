@@ -66,6 +66,7 @@ void USART3_IRQHandler(void);
 void OTG_FS_IRQHandler(void);
 void SPI3_IRQHandler(void);
 void MDF1_FLT0_IRQHandler(void);
+void MDF1_FLT1_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

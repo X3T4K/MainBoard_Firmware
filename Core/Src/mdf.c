@@ -190,6 +190,8 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     /* MDF1 interrupt Init */
     HAL_NVIC_SetPriority(MDF1_FLT0_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(MDF1_FLT0_IRQn);
+    HAL_NVIC_SetPriority(MDF1_FLT1_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(MDF1_FLT1_IRQn);
   /* USER CODE BEGIN MDF1_MspInit 1 */
 
   /* USER CODE END MDF1_MspInit 1 */
@@ -215,6 +217,7 @@ void HAL_MDF_MspDeInit(MDF_HandleTypeDef* mdfHandle)
 
     /* MDF1 interrupt Deinit */
     HAL_NVIC_DisableIRQ(MDF1_FLT0_IRQn);
+    HAL_NVIC_DisableIRQ(MDF1_FLT1_IRQn);
   /* USER CODE BEGIN MDF1_MspDeInit 1 */
 
   /* USER CODE END MDF1_MspDeInit 1 */
