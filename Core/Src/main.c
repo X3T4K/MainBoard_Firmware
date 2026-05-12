@@ -45,6 +45,8 @@
 #include "led_driver.h"
 #include "imu_driver.h"
 #include "bluetooth.h"
+#include <stdint.h>
+#include <stdio.h>
 
 /* USER CODE END Includes */
 
@@ -74,11 +76,9 @@ extern LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
-uint8_t AS7341_start_register = 0x95; 
-
+uint8_t AS7341_start_register = 0x95;
 // Buffer in SRAM4 per LPBAM/DMA
 uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4"))); 
-
 // Offset per la gestione dei dati
 uint8_t DataBufferOffset = 0;
 // --- State Machine ---
@@ -88,32 +88,30 @@ static AppState current_state = STATE_IDLE;
 // --- Global Flags and Variables ---
 // Flag to indicate a USB connection event.
 // Set to 1 when a USB connection is detected.
-uint8_t usb_flag = 0;
+volatile uint8_t usb_flag = 0;
 
 // IMU data structures for accelerometer and gyroscope.
 static IMU_Data accelerometer_data;
 static IMU_Data gyroscope_data;
-
 uint8_t raw_accelerometer[6] = {0};
 uint8_t raw_gyroscope[6] = {0};
 
 /// ----- NAND FLASH variables ----- ///
-
 uint8_t NAND_packet[4096] = {0};
 uint16_t sample = 0;
 uint16_t blocco_scritto = 0;
 uint8_t pagina_scritta=0;
 uint16_t b = 0;
-
 read_address_t blocco;
 column_address_t colonna = 0;
-
 uint16_t bad_blocks[2048]={-1}; // bad blocks array for writing/reading
 uint8_t bad_blocks2[2048]={0}; // bad blocks array for erasing
-
 uint8_t data_letto[4096] = {0};
 int exit_flag = 0;
 
+/// ----- BLE variables ----- ///
+volatile BLE_ConnectionStatus ble_connection_status = BLE_DISCONNECTED; // Inizialmente non connesso
+volatile char ble_connected_mac[14] = {0}; // <--- AGGIUNGI QUESTA RIGA
 // Timestamp variables //
 Time_Struct timestamp;
 uint16_t tim = 0;
@@ -129,6 +127,25 @@ static void MPU_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+// Redirezione della printf verso ITM Stimulus Port 0
+int _write(int file, char *ptr, int len) {
+    for (int i = 0; i < len; i++) {
+        // ITM_SendChar è una funzione CMSIS che scrive direttamente 
+        // nel registro hardware dell'unità di trace.
+        ITM_SendChar(*ptr++);
+    }
+    return len;
+}
+const char* AppState_ToString(AppState state) {
+    switch (state) {
+        case STATE_IDLE:          return "IDLE";
+        case STATE_ACQUISITION:   return "ACQUISITION";
+        case STATE_USB_CONNECTED: return "USB_CONNECTED";
+        case STATE_DOWNLOAD:      return "DOWNLOAD";
+        case STATE_TRANSFER:      return "TRANSFER";
+        default:                  return "UNKNOWN_STATE";
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -158,8 +175,10 @@ int main(void)
   /* Configure the system clock */
   SystemClock_Config();
 
-  /* USER CODE BEGIN SysInit */
-
+  /* USER CODE BEGIN SysInit */ 
+  setvbuf(stdout, NULL, _IONBF, 0);
+  
+  HAL_DBGMCU_EnableDBGStopMode(); // Se prevedi di usare lo Stop mode come nel tuo codice
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -182,6 +201,9 @@ int main(void)
   // Initialize all hardware peripherals (ble, usb, nand flash, imu)
   //da rimuovere fuori debug, perchè all'accensione del dispositivo non è necessario inizializzare il bluetooth e la USB, ma solo quando si preme il bottone per scaricare i dati
   BLE_Initialize();
+  BLE_FlushRxBuffer();  // pulisce residui prima di armare l'IT
+  BLE_StartReceive();   // ← arma una volta sola, poi gira da solo
+
   MX_USB_Device_Init();
   HAL_Delay(1000);
 
@@ -220,37 +242,33 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
-  HAL_DBGMCU_DisableDBGStopMode();
   __HAL_RCC_PWR_CLK_ENABLE();
-  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); //entra in stop mode
 
-
+     
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+  BLE_ProcessRxBuffer(); // ← non blocca, controlla solo i flag
+  //printf("Current State: %s\n", AppState_ToString(current_state)); // Stampa lo stato attuale della macchina a stati
+  
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-		LED_On(LED_GREEN); //così vediamo che si risveglia dallo stop mode, poi si spegne dopo 2 secondi
-		HAL_Delay(2000);
-		LED_Off(LED_GREEN);
 
 	  switch(current_state)
 	  {
 	  	  case STATE_IDLE:
           // Check if a USB connection has been detected
-          if(!usb_flag){
-            //MX_USB_Device_Init();
-          }
-          else{
-          // Transition to the USB_CONNECTED state
-          current_state = STATE_USB_CONNECTED;
-          // Green LED on upon USB Connection
-          LED_On(LED_GREEN);
+          if (usb_flag) {
+              // Transition to the USB_CONNECTED state
+              current_state = STATE_USB_CONNECTED;
+              // Green LED on upon USB Connection
+              LED_On(LED_GREEN);
+          } else {
+              // MX_USB_Device_Init();
           }
           
         break;
@@ -261,6 +279,7 @@ int main(void)
 			  break;
 
 	  	  case STATE_USB_CONNECTED:
+          
 	  		break;
 
 	  	  case STATE_DOWNLOAD:
@@ -275,6 +294,7 @@ int main(void)
         case STATE_TRANSFER:
             // Invia i dati per il grafico
             //send_data_to_app();
+            printf("ready to transfer\n");
         break;
 
 	  }
@@ -356,10 +376,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
         // Send the accelerometer and gyroscope data via BLE
         // We are sending only the X-axis data
-        if(BLE_IsConnected()) {
-            BLE_SendPacket(DATA_TYPE_IMU_ACCELERATION, raw_accelerometer);
+        if (ble_connection_status == BLE_CONNECTED) {
+          BLE_SendPacket(DATA_TYPE_IMU_ACCELERATION, raw_accelerometer);
         }
-        //TODO: Change Gyro function
         //BLE_SendPacket(DATA_TYPE_IMU_GYROSCOPE, (uint32_t)gyroscope_data.x);
 
         // Save the raw accelerometer and gyroscope data in memory

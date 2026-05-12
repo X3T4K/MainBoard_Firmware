@@ -20,10 +20,34 @@
  */
 
 #include <bluetooth.h>
+#include <stdio.h>
 #include "main.h"
+#include "string.h"
+#include "stm32u5xx_hal.h"
+#include "stm32u5xx_hal_cortex.h"
 
 extern UART_HandleTypeDef huart3;
-extern AppState current_state;
+static uint32_t connection_start_time = 0;
+static bool waiting_for_stream = false;
+
+// --- RX Interrupt State Machine ---
+typedef enum {
+    RX_STATE_IDLE,
+    RX_STATE_DATA_PACKET,   // sta raccogliendo {....}
+    RX_STATE_STATUS_MSG,    // sta raccogliendo %....%
+} BLE_RxState;
+
+static uint8_t     rx_byte;                  // buffer singolo byte per IT
+static uint8_t     rx_temp_buf[64];          // buffer di accumulo
+static uint8_t     rx_temp_idx  = 0;
+static BLE_RxState rx_state     = RX_STATE_IDLE;
+
+static uint8_t          rx_data_packet[5];
+uint8_t rx_data_len;
+static char             rx_status_msg[64];
+static volatile uint8_t rx_data_ready   = 0;
+static volatile uint8_t rx_status_ready = 0;
+
 
 // --- Helper Functions (Internal to this file) ---
 // These functions are not meant to be called directly by the user.
@@ -65,7 +89,7 @@ void BLE_Initialize(void) {
     enter_command_mode();
 
     // Set the device name for easy identification
-    uint8_t device_name[] = "SN,BLE_SW\r";
+    uint8_t device_name[] = "SN,BLE_SW_Team_B8\r";
     BLE_SendData(device_name, sizeof(device_name) - 1);
     HAL_UART_Receive(&huart3, command_ok_response, sizeof(command_ok_response), UART_TIMEOUT); // Read 'AOK' response
 
@@ -86,6 +110,7 @@ void BLE_Initialize(void) {
 
     // Exit Command Mode and return to Data Mode
     exit_command_mode();
+    printf("BLE ready");
 }
 
 /**
@@ -260,51 +285,6 @@ void BLE_SendPacket(BLE_DataType ble_data_type, uint8_t* data_buffer) {
     BLE_SendData(ble_packet, sizeof(ble_packet));
 }
 
-/**
- * @brief Verifica se il modulo BLE è connesso a un dispositivo.
- *
- * Questa funzione invia il comando "GK" al modulo RN4871 per verificare lo stato della connessione.
- * @retval 1 Se il modulo è connesso.
- * @retval 0 Se il modulo non è connesso.
- */
-uint8_t BLE_IsConnected(void) {
-    uint8_t connection_status_command[] = "GK\r";
-    uint8_t response[2] = {0};
-
-    // Invia il comando per verificare lo stato della connessione
-    BLE_SendData(connection_status_command, sizeof(connection_status_command) - 1);
-
-    // Ricevi la risposta dal modulo BLE
-    HAL_UART_Receive(&huart3, response, sizeof(response), UART_TIMEOUT);
-
-    // Controlla la risposta: '1' indica che il modulo è connesso
-    if (response[0] == '1') {
-        return 1; // Connesso
-    }
-
-    return 0; // Non connesso
-}
-
-/**
- * @brief Riceve e interpreta un comando BLE dall'app.
- *
- * Questa funzione legge un comando inviato dall'app tramite BLE e lo interpreta.
- * Se il comando è "START_TRANSFER", avvia il trasferimento dei dati.
- */
-void BLE_ProcessStartCommand(void) {
-    uint8_t command_buffer[20] = {0}; // Buffer per il comando ricevuto
-
-    // Ricevi il comando dall'app
-    BLE_ReceiveData(command_buffer, sizeof(command_buffer));
-
-    // Confronta il comando ricevuto con "START_TRANSFER"
-    if (strncmp((char *)command_buffer, "START_TRANSFER", strlen("START_TRANSFER")) == 0) {
-        // Cambia lo stato della macchina a stati per avviare il trasferimento
-        current_state = STATE_TRANSFER;
-    }
-}
-
-
 // --- Helper Function Implementations ---
 // These helper functions encapsulate common, repeated tasks to improve code clarity.
 
@@ -332,4 +312,130 @@ static void exit_command_mode(void) {
     BLE_SendData(data_mode_command, sizeof(data_mode_command) - 1);
     //HAL_UART_Receive(&huart3, command_ok_response, sizeof(command_ok_response), UART_TIMEOUT);
     HAL_Delay(100);
+}
+
+void BLE_FlushRxBuffer(void) {
+    uint8_t dummy;
+    // Legge e scarta tutto ciò che è rimasto nel buffer, finché non c'è più nulla
+    while (HAL_UART_Receive(&huart3, &dummy, 1, 5) == HAL_OK);
+    printf("[BLE] Buffer pulito\n");
+}
+
+
+// // --- Callback Functions ---
+// These functions are called by the HAL library in response to hardware events
+
+/**
+ * @brief Arma il primo interrupt RX. Va chiamata una volta sola dopo BLE_Initialize().
+ */
+
+void BLE_StartReceive(void) {
+    HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+}
+
+/**
+ * @brief Callback HAL: chiamata automaticamente ad ogni byte ricevuto.
+ *        Esegue la state machine e ri-arma subito l'interrupt.
+ */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart != &huart3) return;
+
+    uint8_t b = rx_byte;
+
+    switch (rx_state) {
+
+        case RX_STATE_IDLE:
+            if (b == '{') {
+                rx_temp_buf[rx_temp_idx++] = b;
+                rx_state = RX_STATE_DATA_PACKET;
+            } else if (b == '%') {
+                rx_temp_buf[rx_temp_idx++] = b;
+                rx_state = RX_STATE_STATUS_MSG;
+            }
+            // qualsiasi altro byte in idle: scartato silenziosamente
+            break;
+
+        case RX_STATE_DATA_PACKET:
+            rx_temp_buf[rx_temp_idx++] = b;
+            if (b == '}') {
+                // pacchetto completo
+                rx_data_len = rx_temp_idx;
+                memset(rx_data_packet, 0, sizeof(rx_data_packet));
+                memcpy(rx_data_packet, rx_temp_buf, rx_temp_idx);
+                rx_data_ready = 1;
+                rx_temp_idx   = 0;
+                rx_state      = RX_STATE_IDLE;
+            } else if (rx_temp_idx >= sizeof(rx_temp_buf)) {
+                // overflow: pacchetto malformato, reset
+                rx_temp_idx = 0;
+                rx_state    = RX_STATE_IDLE;
+            }
+            break;
+
+        case RX_STATE_STATUS_MSG:
+            rx_temp_buf[rx_temp_idx++] = b;
+            if (b == '%' && rx_temp_idx > 1) {
+                // messaggio di stato completo (es. %CONNECT,xxx%)
+                memcpy(rx_status_msg, rx_temp_buf, rx_temp_idx);
+                rx_status_msg[rx_temp_idx] = '\0';
+                rx_status_ready = 1;
+                rx_temp_idx     = 0;
+                rx_state        = RX_STATE_IDLE;
+            } else if (rx_temp_idx >= sizeof(rx_temp_buf)) {
+                rx_temp_idx = 0;
+                rx_state    = RX_STATE_IDLE;
+            }
+            break;
+    }
+
+    // Ri-arma subito per il prossimo byte
+    HAL_UART_Receive_IT(&huart3, &rx_byte, 1);
+}
+
+/**
+ * @brief Da chiamare nel main loop: processa i messaggi completati dall'interrupt.
+ *        Non blocca mai.
+ */
+void BLE_ProcessRxBuffer(void) {
+    if (rx_data_ready) {
+        rx_data_ready = 0;
+        for (int i = 0; i < rx_data_len; i++) {
+            printf("%d ", rx_data_packet[i]);
+        }
+        printf("\n");
+        if (rx_data_packet[1] == 6) {
+
+            uint8_t ack_packet[] = {123, 7, 125};
+
+            BLE_SendData(ack_packet, sizeof(ack_packet));
+            printf("[BLE] ACK inviato\n");
+        }
+    }
+    if (rx_status_ready) {
+
+        printf("[BLE STATUS] %s\n", rx_status_msg);
+        rx_status_ready = 0;
+
+       if(strstr(rx_status_msg, "DISCONNECT")) {
+            ble_connection_status = BLE_DISCONNECTED;
+            printf("[BLE] Disconnesso\n");
+        }else if (strstr(rx_status_msg, "CONNECT")) {
+            waiting_for_stream = true;
+            connection_start_time = HAL_GetTick(); // Registro il tempo di inizio
+            printf("[BLE] Connesso, attendo STREAM_OPEN...\n");
+            printf("[BLE] Tempo di inizio connessione: %lu\n", (unsigned long)connection_start_time);
+        } 
+        else if (strstr(rx_status_msg, "STREAM_OPEN")) {
+            waiting_for_stream = false; // Handshake completato con successo
+            printf("[BLE] Stream aperto\n");
+        }
+        rx_status_ready = 0;
+        // Controllo del Timeout (es. 5 secondi)
+        if (waiting_for_stream && (HAL_GetTick() - connection_start_time > 5000)) {
+            printf("[BLE] TIMEOUT: Stream non aperto. Reset modulo...\n");
+            waiting_for_stream = false;
+            BLE_HardReset(); // Forza il modulo a tornare in Advertising
+        }
+}
+    }
 }

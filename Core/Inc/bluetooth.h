@@ -37,5 +37,15 @@ void BLE_SetSlowAdvertisements(void);
 void BLE_SendData(uint8_t* data, uint8_t data_length);
 void BLE_ReceiveData(uint8_t* data, uint8_t data_length);
 void BLE_SendPacket(BLE_DataType ble_data_type, uint8_t* data_buffer);
+void BLE_StartReceive(void);
+void BLE_ProcessRxBuffer(void);
+
+typedef enum {
+    BLE_DISCONNECTED = 0,
+    BLE_CONNECTED    = 1
+} BLE_ConnectionStatus;
+extern volatile char ble_connected_mac[14];
+extern volatile BLE_ConnectionStatus ble_connection_status;
+
 
 #endif /* INC_BLUETOOTH_H_ */
