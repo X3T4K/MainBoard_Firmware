@@ -56,7 +56,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-
+#define AUDIO_SAMPLES 512  // Numero di campioni per il calcolo
 
 /* USER CODE END PD */
 
@@ -70,7 +70,12 @@
 I2C_HandleTypeDef hi2c3;
 DMA_HandleTypeDef handle_LPDMA1_Channel0;
 LPTIM_HandleTypeDef hlptim1;
+
 /* USER CODE BEGIN PV */
+
+uint16_t audio_buffer[AUDIO_SAMPLES];    
+float32_t rms_value;
+float32_t dbfs_value;
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
 uint8_t AS7341_start_register = 0x95; 
@@ -167,8 +172,7 @@ int main(void)
   MX_I2C3_Init();
   MX_LPTIM1_Init();
   MX_ICACHE_Init();
-  MX_MDF1_Init();
-  MX_SPI2_Init();
+  MX_MDF1_Init();  MX_SPI2_Init();
   MX_SPI3_Init();
   MX_TIM2_Init();
   MX_USART3_UART_Init();
@@ -222,7 +226,13 @@ int main(void)
   __HAL_RCC_PWR_CLK_ENABLE();
   HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); //wake up only when there is an interupt
 
-
+  /* USER CODE BEGIN MDF Start */
+  // Avvia l'SCD (Short Circuit Detector) sul filtro 1 in modalità interrupt
+  mdfScdConfig1.Threshold = 5;
+  if (HAL_MDF_ScdStart_IT(&MdfHandle1, &mdfScdConfig1) != HAL_OK)
+  {
+    Error_Handler();
+  }
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -426,6 +436,58 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 	{
 
 	}
+}
+
+
+// funzione calcolo decibel da energia segnale buffer
+void Calculate_dB(uint16_t *buffer, uint16_t size) {
+    long long sum_sq = 0;
+    
+    // 1. Calcolo della somma dei quadrati (Energia)
+    for(int i=0; i<size; i++) {
+        // Centriamo il segnale (da 0-65535 a circa -32768/+32767)
+        int32_t sample = (int32_t)buffer[i] - 32768; 
+        sum_sq += (sample * sample);
+    }
+    
+    // 2. Calcolo del valore RMS
+    float rms = sqrtf((float)sum_sq / size);
+    
+    // 3. Conversione in dBFS
+    // 32768.0f è il valore massimo per un segnale a 16 bit
+    if (rms > 0) {
+        dbfs_value = 20.0f * log10f(rms / 32768.0f);
+    } else {
+        dbfs_value = -100.0f; // Silenzio assoluto
+    }
+}
+
+
+// Callback per il rilevamento di eventi di stress acustico (SCD)
+void HAL_MDF_ErrorCallback(MDF_HandleTypeDef *hmdf)
+{
+    if ((hmdf->Instance == MDF1_Filter1) && (hmdf->ErrorCode & MDF_ERROR_SHORT_CIRCUIT))
+    {
+        // 1. Accendi il LED di allerta
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+
+        HAL_Delay(100); // Mantieni il LED acceso per 100 ms
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+        
+        // 2. Fai partire una cattura rapida di campioni col Filtro 0
+        //HAL_MDF_SincFilter_Start_DMA(MdfHandle0, &audio_buffer[0], AUDIO_SAMPLES);
+    }
+}
+
+// Quando il buffer è pieno, calcoliamo i dB
+void HAL_MDF_AcqCompleteCallback(MDF_HandleTypeDef *hmdf)
+{
+    Calculate_dB(audio_buffer, AUDIO_SAMPLES);
+    
+    // Se i dB confermano lo stress (es. sopra i -10 dBFS)
+    if(dbfs_value > -10.0f) {
+        // Conferma allarme o invia dati via Bluetooth
+    }
 }
 
 /* USER CODE END 4 */
