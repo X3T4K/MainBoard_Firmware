@@ -28,6 +28,7 @@
 #include "lpdma.h"
 #include "lptim.h"
 #include "mdf.h"
+#include "rtc.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -95,7 +96,7 @@ volatile uint8_t lpbam_cycle_complete = 0; // interrupt di fine ciclo
 // Buffer in SRAM4 per LPBAM/DMA
 __attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[60]; // Buffer per i dati luce blu
 uint8_t DataBufferOffset = 0; // Offset per leggere i dati luce blu (CH0-CH5) dopo i primi 3 byte di STATUS, ASTATUS e GAIN
-__attribute__((section(".sram4_retention"))) uint8_t Flicke_buffer[5]; // Buffer per i dati del flicker
+__attribute__((section(".sram4_retention"))) uint8_t Flicker_buffer[5]; // Buffer per i dati del flicker
 // --- State Machine ---
 // The current state of the application. Initial state is IDLE.
 static AppState current_state = STATE_IDLE;
@@ -184,6 +185,7 @@ int main(void)
   MX_LPTIM1_Init();
   MX_ICACHE_Init();
   MX_MDF1_Init();
+  MX_RTC_Init();
   MX_SPI2_Init();
   MX_SPI3_Init();
   MX_TIM2_Init();
