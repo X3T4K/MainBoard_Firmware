@@ -75,10 +75,22 @@ DMA_HandleTypeDef handle_LPDMA1_Channel0;
 LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
+/// @brief 
+typedef struct {
+    uint32_t timestamp;  // timestamp misura
+    uint8_t luce_artificiale;  // risultato flicker
+    uint16_t deep_blue;  // dati canale deep blue 
+    uint16_t blue;  // dati canale blue 
+    uint16_t clear;   // dati canale clear
+} data_packet;
+
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
 uint8_t AS7341_start_register = 0x93; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
 uint8_t Flicker_REG = 0xDB;
+
+volatile uint8_t as7341_int_ready = 0; // interruot di soglia
+volatile uint8_t lpbam_cycle_complete = 0; // interrupt di fine ciclo
 
 
 // Buffer in SRAM4 per LPBAM/DMA
@@ -430,6 +442,25 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 	}
 }
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	// Verifica che l'interrupt provenga dal pin STM32 collegato a INT dell'AS7341
+	// (Sostituisci AS7341_INT_Pin con la macro corretta generata da CubeMX, es. GPIO_PIN_5)
+	if (GPIO_Pin == GPIO_PIN_5) {
+		as7341_int_ready = 1; // Alza la bandierina! La CPU è sveglia.
+	}
+}
+
+// Callback che scatta quando il DMA ha finito il suo ultimo trasferimento/nodo
+void HAL_DMA_RxCpltCallback(DMA_HandleTypeDef *hdma) {
+	// Sostituisci "handle_LPDMA1_Channel0" con la variabile generata dal tuo CubeMX
+	// per il canale DMA che gestisce la tua coda LPBAM.
+	// Puoi anche usare (hdma->Instance == LPDMA1_Channel0)
+	if (hdma == &handle_LPDMA1_Channel0) {
+		lpbam_cycle_complete = 1; // Il ciclo autonomo è finito, sveglia la CPU!
+	}
+}
+
+
 /* USER CODE END 4 */
 
  /* MPU Configuration */
@@ -456,6 +487,10 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+
+  }
+
+    
   }
   /* USER CODE END Error_Handler_Debug */
 }
