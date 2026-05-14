@@ -100,6 +100,8 @@ typedef enum {
     STATE_USB_CONNECTED, // The device is connected to a computer via USB.
     STATE_DOWNLOAD       // The device is in the process of downloading data.
 } AppState;
+
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
