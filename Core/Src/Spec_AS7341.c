@@ -1,8 +1,18 @@
 #include "Spec_AS7341.h"
 #include "i2c.h" // Per avere accesso alla variabile hi2c3
 
-// ... [Funzioni Write/Read invariate] ...
+// Implementazione della scrittura su registro I2C
+void SPEC_WriteRegister(uint8_t reg, uint8_t value) {
+    // hi2c3 è l'handle dell'I2C, SPEC_I2C_ADDR è l'indirizzo a 8-bit definito nell'header
+    HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &value, 1, HAL_MAX_DELAY);
+}
 
+// Implementazione della lettura da registro I2C
+uint8_t SPEC_ReadRegister(uint8_t reg) {
+    uint8_t value = 0;
+    HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, reg, I2C_MEMADD_SIZE_8BIT, &value, 1, HAL_MAX_DELAY);
+    return value;
+}
 // 1. PRIMA MODIFICA: Rimettiamo 0x06 alla fine per collegare il Flicker all'ADC 5
 const uint8_t smux_config_F1_F3_CLEAR_FLICKER[20] = {
     0x30, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, // Modificato byte 5

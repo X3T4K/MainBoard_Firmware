@@ -1,10 +1,11 @@
 #include "callback_LPDMA.h"
 #include "main.h"
+#include "Memory_operations.h"
 
 extern uint8_t NAND_packet[4096];
 extern uint16_t nand_offset;
-
-float f1Cost = 69.660;
+extern data_packet;
+float f1Cost = 69.660;  // VERIFICARE I VALORI, HO UN DEEP RESEARCH DA VALUTARE
 float f2Cost = 34.830;
 
 void Elabora_e_Salva_Campionamento_Multiplo(void) {
@@ -16,7 +17,6 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
         // Al giro 0 parte da 0. Al giro 1 parte da 12. Al giro 2 da 24, ecc.
         uint16_t color_idx = i * AS7341_COLOR_BPS;
     	uint16_t flick_idx = j;
-        data_packet sample;
 
         // --- 1. ESTRAZIONE GAIN (Relativo al campionamento corrente) ---
         uint8_t current_gain = AS7341_Rx_Buffer[color_idx + 1] & 0x0F;
@@ -58,13 +58,13 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
     	if (valid_100 & valid_120 & flicker_measure_valid & !saturation_flicker) {
             
             if (flicker_100){
-                luce_artificiale = 1; 
+                data_packet.luce_artificiale = 1; 
             } 
             else if (flicker_120){
-                luce_artificiale = 1;
+                data_packet.luce_artificiale = 1;
             }
             else {
-                luce_artificiale = 0; 
+                data_packet.luce_artificiale = 0; 
             }
         }
 
@@ -76,37 +76,36 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
         // Canale Clear si trova ai byte 9 e 10 del blocco corrente
         uint16_t clear_raw = ((uint16_t)AS7341_Rx_Buffer[color_idx + 11] << 8) | AS7341_Rx_Buffer[color_idx + 10];
 
-        //dati in irradiance 
-
-        sample.blue    = (uint16_t)(f2Cost * (float)blue_raw) ; //non divido per current gain qui perche lo faccio a dopo la scalatura.
-        sample.deep_blue    = (uint16_t)(f1Cost * (float)deep_blue_raw);
-
-        // --- 3. SCALATURA OTTIMIZZATA ---
+        
+        // --- 3. NORMALIZZAZIONE E CONVERSION IN DATI FISICI ---
 		// 40000= 20*1000	20 è fisso perchè è 1/0.05, 1000 è variabile, scelto arbitrariamente
         uint32_t temp_blue  = (uint32_t)blue_raw * 40000;
         uint32_t temp_deep_blue  = (uint32_t)deep_blue_raw * 40000;
         uint32_t temp_clear = (uint32_t)clear_raw * 40000;
-
-
+        
         // Applichiamo la scalatura ottimizzata (shift a destra invece di divisione), cioe divide per il gain attuale 
 
-        sample.blue    = (uint16_t)(temp_blue >> current_gain);
-        sample.deep_blue = (uint16_t)(temp_deep_blue >> current_gain);
-        sample.clear = (uint16_t)(temp_clear >> current_gain);
+        data_packet.blue    = (uint16_t)(temp_blue >> current_gain);
+        data_packet.deep_blue = (uint16_t)(temp_deep_blue >> current_gain);
+        data_packet.clear = (uint16_t)(temp_clear >> current_gain);
 
-        
+        //dati in irradiance 
+
+        uint16_t blue_microW    = (uint16_t)(f2Cost * data_packet.blue) ;
+        uint16_t deep_blue_microW    = (uint16_t)(f1Cost *data_packet.deep_blue);
+
 
         // --- 4. SALVATAGGIO IN NAND ---
-        memcpy(&NAND_packet[nand_offset], &sample.deep_blue, sizeof(uint16_t));
+        memcpy(&NAND_packet[nand_offset], &data_packet.deep_blue, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
-        memcpy(&NAND_packet[nand_offset], &sample.blue, sizeof(uint16_t));
+        memcpy(&NAND_packet[nand_offset], &data_packet.blue, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
-        memcpy(&NAND_packet[nand_offset], &sample.clear, sizeof(uint16_t));
+        memcpy(&NAND_packet[nand_offset], &data_packet.clear, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
-         memcpy(&NAND_packet[nand_offset], &luce_artificiale, sizeof(uint8_t));
+         memcpy(&NAND_packet[nand_offset], &data_packet.luce_artificiale, sizeof(uint8_t));
         nand_offset += sizeof(uint8_t);
 
         // Controllo della pagina NAND.

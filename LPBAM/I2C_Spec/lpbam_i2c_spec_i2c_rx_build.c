@@ -138,9 +138,11 @@ DMA_QListTypeDef Blue_Flick_Acq_Q;
 /* USER CODE BEGIN EV */
 /* DICHIARAZIONI - Servono per "vedere" le variabili definite altrove */
 
-extern uint8_t AS7341_start_register;
+extern uint8_t AS7341_start_register[1];
 extern uint8_t AS7341_Rx_Buffer[60];
 extern uint8_t DataBufferOffset;
+extern uint8_t Flicker_REG[1];
+extern uint8_t Flicker_buffer[5];
 /* USER CODE END EV */
 
 /* Private function prototypes ---------------------------------------------------------------------------------------*/

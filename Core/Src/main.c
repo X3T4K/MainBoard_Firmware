@@ -47,6 +47,8 @@
 #include "imu_driver.h"
 #include "bluetooth.h"
 #include "Spec_AS7341.h"
+#include "callback_LPDMA.h"
+#include "lpbam_i2c_spec.h"
 
 
 /* USER CODE END Includes */
@@ -70,13 +72,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-I2C_HandleTypeDef hi2c3;
-DMA_HandleTypeDef handle_LPDMA1_Channel0;
-LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 /// @brief 
-typedef struct {
+typedef struct packed{
     uint32_t timestamp;  // timestamp misura
     uint8_t luce_artificiale;  // risultato flicker
     uint16_t deep_blue;  // dati canale deep blue 
@@ -84,12 +83,15 @@ typedef struct {
     uint16_t clear;   // dati canale clear
 } data_packet;
 
-//uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
-uint8_t AS7341_start_register = 0x93; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
-// Registro di partenza (Nota: meglio uint8_t per registri I2C)
-uint8_t Flicker_REG = 0xDB;
+// CONTROLLARE CHE QUANDO CHIAMO IL SALVATAGGIO DATI IN "CALLBACK_LPDMA" SIA EFFETTIVAMENTE IN GRADO DI PRENDERE DALL'ESTERNO QUESTA STRUTTURA.
 
-volatile uint8_t as7341_int_ready = 0; // interruot di soglia
+
+//uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
+uint8_t AS7341_start_register[1] = {0x93} ; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
+// Registro di partenza (Nota: meglio uint8_t per registri I2C)
+uint8_t Flicker_REG[1] = {0xDB};
+
+volatile uint8_t as7341_int_alarm = 0; // interrupt di soglia
 volatile uint8_t lpbam_cycle_complete = 0; // interrupt di fine ciclo
 
 
@@ -140,6 +142,23 @@ uint16_t tim = 0;
 void SystemClock_Config(void);
 static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	// Verifica che l'interrupt provenga dal pin STM32 collegato a INT dell'AS7341
+	// (Sostituisci AS7341_INT_Pin con la macro corretta generata da CubeMX, es. GPIO_PIN_5)
+	if (GPIO_Pin == GPIO_PIN_5) {
+		as7341_int_alarm = 1; // Alza la bandierina! La CPU è sveglia.
+	}
+}
+
+// Callback che scatta quando il DMA ha finito il suo ultimo trasferimento/nodo
+void HAL_DMA_RxCpltCallback(DMA_HandleTypeDef *hdma) {
+	// Sostituisci "handle_LPDMA1_Channel0" con la variabile generata dal tuo CubeMX
+	// per il canale DMA che gestisce la tua coda LPBAM.
+	// Puoi anche usare (hdma->Instance == LPDMA1_Channel0)
+	if (hdma == &handle_LPDMA1_Channel0) {
+		lpbam_cycle_complete = 1; // Il ciclo autonomo è finito, sveglia la CPU!
+	}
+}
 
 /* USER CODE END PFP */
 
@@ -238,7 +257,7 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
   HAL_DBGMCU_DisableDBGStopMode();
   __HAL_RCC_PWR_CLK_ENABLE();
-  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); //wake up only when there is an interupt
+  
 
 
   /* USER CODE END 2 */
@@ -247,6 +266,32 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      // 1. Vai in Stop 2 e aspetta un evento (interrupt)
+      HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+
+    // 2. Interrupt arrivato, 2 casi
+    if (lpbam_cycle_complete) {
+        // Caso 1: Il ciclo LPBAM è completo, salvo i dati
+        lpbam_cycle_complete = 0; // Resetta la bandierina
+        Elabora_e_Salva_Campionamento_Multiplo(); // Elabora i dati acquisiti e salva in memoria
+        //  Pulisce l'interrupt sul sensore AS7341
+		    // Legge il registro STATUS (0x93) e lo riscrive per pulire il bit AINT
+			  uint8_t status_reg = 0;
+      	// Legge lo stato (e i flag degli interrupt attivi)
+      		HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+
+      	// Riscrive lo stesso valore. I bit a "1" verranno azzerati dal sensore
+      		HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+
+     }else if (as7341_int_alarm){
+        // Caso 2: L'interrupt di soglia è arrivato, avverte subito via BLE
+        uint8_t AS7341_TRESHOLD[]={[0]=123, [1]=9, [2]=125}; 
+        BLE_SendData(AS7341_TRESHOLD, sizeof(AS7341_TRESHOLD));
+        printf("[BLE] Soglia superata\n");// invia la notifica attraverso BLE
+        as7341_int_alarm = 0; // Resetta la bandierina
+     }
+
+   
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -442,23 +487,6 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 	}
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	// Verifica che l'interrupt provenga dal pin STM32 collegato a INT dell'AS7341
-	// (Sostituisci AS7341_INT_Pin con la macro corretta generata da CubeMX, es. GPIO_PIN_5)
-	if (GPIO_Pin == GPIO_PIN_5) {
-		as7341_int_ready = 1; // Alza la bandierina! La CPU è sveglia.
-	}
-}
-
-// Callback che scatta quando il DMA ha finito il suo ultimo trasferimento/nodo
-void HAL_DMA_RxCpltCallback(DMA_HandleTypeDef *hdma) {
-	// Sostituisci "handle_LPDMA1_Channel0" con la variabile generata dal tuo CubeMX
-	// per il canale DMA che gestisce la tua coda LPBAM.
-	// Puoi anche usare (hdma->Instance == LPDMA1_Channel0)
-	if (hdma == &handle_LPDMA1_Channel0) {
-		lpbam_cycle_complete = 1; // Il ciclo autonomo è finito, sveglia la CPU!
-	}
-}
 
 
 /* USER CODE END 4 */
@@ -486,12 +514,7 @@ void Error_Handler(void)
   /* User can add his own implementation to report the HAL error return state */
   __disable_irq();
   while (1)
-  {
-
-  }
-
-    
-  }
+  {  }
   /* USER CODE END Error_Handler_Debug */
 }
 #ifdef USE_FULL_ASSERT
