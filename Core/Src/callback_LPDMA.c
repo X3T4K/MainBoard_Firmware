@@ -89,11 +89,6 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
         data_packet.deep_blue = (uint16_t)(temp_deep_blue >> current_gain);
         data_packet.clear = (uint16_t)(temp_clear >> current_gain);
 
-        //dati in irradiance 
-
-        uint16_t blue_microW    = (uint16_t)(f2Cost * data_packet.blue) ;
-        uint16_t deep_blue_microW    = (uint16_t)(f1Cost *data_packet.deep_blue);
-
 
         // --- 4. SALVATAGGIO IN NAND ---
         memcpy(&NAND_packet[nand_offset], &data_packet.deep_blue, sizeof(uint16_t));
