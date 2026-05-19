@@ -2,26 +2,31 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "cwd": "${workspaceFolder}",
-            "executable": "${command:cmake.launchTargetPath}",
-            "name": "Debug SWDP",
+            "name": "Debug SWDP (OpenOCD)",
+            "type": "cortex-debug",
             "request": "launch",
-            "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "showDevDebugOutput": "none",
-            "servertype": "stlink"
-        },
-
-        {
-            "cwd": "${workspaceFolder}",
+            "servertype": "openocd", // Cambiato da stlink a openocd
             "executable": "${command:cmake.launchTargetPath}",
-            "name": "Attach to Main Board",
-            "request": "attach",
-            "type": "cortex-debug",
-            "runToEntryPoint": "main",
-            "showDevDebugOutput": "none",
-            "servertype": "stlink"
+            "device": "STM32U575xx",
+            "liveWatch":{
+                "enabled": true,
+                "samplesPerSecond": 4
+            },
+            "svdFile": "${workspaceFolder}/STM32U575.svd",
+            "configFiles": [
+                "interface/stlink.cfg",
+                "target/stm32u5x.cfg" // Configurazione specifica per serie U5
+            ],
+            "swoConfig": {
+                "enabled": true,
+                "cpuFrequency": 72000000, // Deve essere l'HCLK reale
+                "swoFrequency": 2000000,
+                "runInTerminal": true,
+                "source": "probe",
+                "decoders": [
+                    { "type": "console", "label": "ITM Log", "port": 0 }
+                ]
+            }
         }
     ]
 }
- 

@@ -165,6 +165,16 @@ void HAL_DMA_RxCpltCallback(DMA_HandleTypeDef *hdma) {
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+// Redirezione della printf verso ITM Stimulus Port 0
+int _write(int file, char *ptr, int len) {
+    for (int i = 0; i < len; i++) {
+        // ITM_SendChar Ã¨ una funzione CMSIS che scrive direttamente 
+        // nel registro hardware dell'unitÃ  di trace.
+        ITM_SendChar(*ptr++);
+    }
+    return len;
+}
+
 /* USER CODE END 0 */
 
 /**
