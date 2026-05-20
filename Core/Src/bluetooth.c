@@ -21,6 +21,7 @@
 
 #include <bluetooth.h>
 #include <stdio.h>
+#include "SPI_NAND.h"
 #include "main.h"
 #include "string.h"
 #include "stm32u5xx_hal.h"
@@ -399,16 +400,19 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 void BLE_ProcessRxBuffer(void) {
     if (rx_data_ready) {
         rx_data_ready = 0;
-        for (int i = 0; i < rx_data_len; i++) {
-            printf("%d ", rx_data_packet[i]);
-        }
-        printf("\n");
+        //Caso ACK, Rispondo con un contro ACK per confermare la ricezione del pacchetto
         if (rx_data_packet[1] == 6) {
-
             uint8_t ack_packet[] = {123, 7, 125};
-
             BLE_SendData(ack_packet, sizeof(ack_packet));
             printf("[BLE] ACK inviato\n");
+        // Caso ENQ_S, il dispositivo esterno sta chiedendo di iniziare la trasmissione dei dati spettrometro
+        } else if (rx_data_packet[1] == 4) {
+            read_spectrumData_and_BLE_transmit();
+            printf("[BLE] ENQ_S ricevuto, inizio trasmissione dati...\n");
+        // Caso ENQ_M, il dispositivo esterno sta chiedendo di iniziare la trasmissione dei dati microfono
+        } else if (rx_data_packet[1] == 5) {
+            read_micData_and_BLE_transmit();
+            printf("[BLE] ENQ_M ricevuto, inizio trasmissione dati...\n");
         }
     }
     if (rx_status_ready) {
@@ -438,4 +442,12 @@ void BLE_ProcessRxBuffer(void) {
         }
 }
     }
+}
+
+void read_spectrumData_and_BLE_transmit(){
+
+}
+
+void read_micData_and_BLE_transmit(){
+
 }

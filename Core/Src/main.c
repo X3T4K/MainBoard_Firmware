@@ -249,10 +249,16 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
-  BLE_ProcessRxBuffer(); // ← non blocca, controlla solo i flag
-  //printf("Current State: %s\n", AppState_ToString(current_state)); // Stampa lo stato attuale della macchina a stati
+  while (1){
+    BLE_ProcessRxBuffer(); // ← non blocca, controlla solo i flag
+
+    //Abbozzo codice controllo flag interrupt
+    if (AS7341InterruptFlag == 1) {
+      uint8_t AS7341Interrupt[] = {123, 9, 125};
+      BLE_SendData(AS7341Interrupt, sizeof(AS7341Interrupt));
+      printf("[BLE] Interrupt AS7341 inviato\n");
+      AS7341InterruptFlag = 0; // Reset del flag dopo l'invio
+    }
   
     /* USER CODE END WHILE */
 
