@@ -1,22 +1,29 @@
 #include "callback_LPDMA.h"
 #include "main.h"
 #include "Memory_operations.h"
+#include <stdint.h>
 
-extern uint8_t NAND_packet[4096];
+extern uint16_t NAND_packet[4096];
 extern uint16_t nand_offset;
-extern data_packet;
-float f1Cost = 69.660;  // VERIFICARE I VALORI, HO UN DEEP RESEARCH DA VALUTARE
-float f2Cost = 34.830;
+extern data_packet pacchetto;
+extern Time_Struct time_date;
 
-void Elabora_e_Salva_Campionamento_Multiplo(void) {
+
+void Elabora_e_Salva_Campionamento_Multiplo( data_packet pacchetto,Time_Struct time_date) 
+{
+    // Prendiamo il tempo subito
+    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	time_date={.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+   
 
     // Cicliamo attraverso tutti i campionamenti che LPBAM ha depositato in SRAM4
-    for (uint16_t i = 0, j=0; i < NUM_SAMPLES_PER_WAKEUP, j < NUM_SAMPLES_PER_WAKEUP; i++, j++) {
+    for (uint16_t i = 0; i < NUM_SAMPLES_PER_WAKEUP; i++) {
 
         // Calcoliamo l'indice di partenza per il campionamento corrente
         // Al giro 0 parte da 0. Al giro 1 parte da 12. Al giro 2 da 24, ecc.
         uint16_t color_idx = i * AS7341_COLOR_BPS;
-    	uint16_t flick_idx = j;
+    	uint16_t flick_idx = i;
 
         // --- 1. ESTRAZIONE GAIN (Relativo al campionamento corrente) ---
         uint8_t current_gain = AS7341_Rx_Buffer[color_idx + 1] & 0x0F;
@@ -31,40 +38,40 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
             uint8_t flicker_measure_valid = 0; 
             uint8_t luce_artificiale = 0;
 
-    	if(Flicker_buffer[flick_idx] & 0x00){
-             uint8_t flicker_100 = 1; 
+    	if(Flicker_buffer[flick_idx] & 0x01){
+             flicker_100 = 1; 
         }
 
-        if(Flicker_buffer[flick_idx] & 0x01){
-             uint8_t flicker_120 = 1; 
-        }
-        
         if(Flicker_buffer[flick_idx] & 0x02){
-             uint8_t valid_100 = 1; 
-        }
-
-        if(Flicker_buffer[flick_idx] & 0x03){
-             uint8_t valid_120 = 1; 
-        }
-
-        if(Flicker_buffer[flick_idx] & 0x04){
-             uint8_t saturation_flicker = 1; 
-        }
-
-        if(Flicker_buffer[flick_idx] & 0x05){
-             uint8_t flicker_measure_valid = 1; 
+              flicker_120 = 1; 
         }
         
-    	if (valid_100 & valid_120 & flicker_measure_valid & !saturation_flicker) {
+        if(Flicker_buffer[flick_idx] & 0x04){
+              valid_100 = 1; 
+        }
+
+        if(Flicker_buffer[flick_idx] & 0x08){
+              valid_120 = 1; 
+        }
+
+        if(Flicker_buffer[flick_idx] & 0x10){
+             saturation_flicker = 1; 
+        }
+
+        if(Flicker_buffer[flick_idx] & 0x20){
+             flicker_measure_valid = 1; 
+        }
+        
+    	if (valid_100 && valid_120 && flicker_measure_valid && !saturation_flicker) {
             
             if (flicker_100){
-                data_packet.luce_artificiale = 1; 
+                pacchetto.luce_artificiale = 1; 
             } 
             else if (flicker_120){
-                data_packet.luce_artificiale = 1;
+                pacchetto.luce_artificiale = 1;
             }
             else {
-                data_packet.luce_artificiale = 0; 
+                pacchetto.luce_artificiale = 0; 
             }
         }
 
@@ -84,23 +91,32 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
         uint32_t temp_clear = (uint32_t)clear_raw * 40000;
         
         // Applichiamo la scalatura ottimizzata (shift a destra invece di divisione), cioe divide per il gain attuale 
-
-        data_packet.blue    = (uint16_t)(temp_blue >> current_gain);
-        data_packet.deep_blue = (uint16_t)(temp_deep_blue >> current_gain);
-        data_packet.clear = (uint16_t)(temp_clear >> current_gain);
-
+        
+        pacchetto.blue    = (uint16_t)(temp_blue >> (current_gain-1));
+        pacchetto.deep_blue = (uint16_t)(temp_deep_blue >> (current_gain-1));
+        pacchetto.clear = (uint16_t)(temp_clear >> (current_gain-1));
+        
+        if (nand_offset >= 2048) {
+            write_memory();
+            nand_offset = 0;
+        }
+        write_packet(i, time_date, pacchetto, NAND_packet); // Scrive il pacchetto elaborato nel buffer NAND
+        nand_offset= nand_offset + 7; // Aggiorna l'offset per il prossimo campione (14 byte per campione: 6 di timestamp + 8 di dati)
+        
+       // Salva in memoria ogni campione, per sicurezza 
 
         // --- 4. SALVATAGGIO IN NAND ---
-        memcpy(&NAND_packet[nand_offset], &data_packet.deep_blue, sizeof(uint16_t));
+        /*
+        memcpy(&NAND_packet[nand_offset], &paccheto.deep_blue, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
-        memcpy(&NAND_packet[nand_offset], &data_packet.blue, sizeof(uint16_t));
+        memcpy(&NAND_packet[nand_offset], &paccheto.blue, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
-        memcpy(&NAND_packet[nand_offset], &data_packet.clear, sizeof(uint16_t));
+        memcpy(&NAND_packet[nand_offset], &paccheto.clear, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
-         memcpy(&NAND_packet[nand_offset], &data_packet.luce_artificiale, sizeof(uint8_t));
+         memcpy(&NAND_packet[nand_offset], &paccheto.luce_artificiale, sizeof(uint8_t));
         nand_offset += sizeof(uint8_t);
 
         // Controllo della pagina NAND.
@@ -110,7 +126,11 @@ void Elabora_e_Salva_Campionamento_Multiplo(void) {
             write_memory();
             nand_offset = 0;
         }
-
+        */
+        
+       
     } // Fine del ciclo for: passa al prossimo campionamento nel buffer SRAM4
 }
+
+
 

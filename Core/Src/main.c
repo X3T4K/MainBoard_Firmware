@@ -49,6 +49,7 @@
 #include "Spec_AS7341.h"
 #include "callback_LPDMA.h"
 #include "lpbam_i2c_spec.h"
+#include <stdint.h>
 
 
 /* USER CODE END Includes */
@@ -76,13 +77,13 @@
 
 /// @brief 
 typedef struct packed{
-    uint32_t timestamp;  // timestamp misura
-    uint8_t luce_artificiale;  // risultato flicker
+    uint16_t luce_artificiale;  // risultato flicker
     uint16_t deep_blue;  // dati canale deep blue 
     uint16_t blue;  // dati canale blue 
     uint16_t clear;   // dati canale clear
 } data_packet;
-
+data_packet pacchetto;
+extern Time_Struct time_date;
 // CONTROLLARE CHE QUANDO CHIAMO IL SALVATAGGIO DATI IN "CALLBACK_LPDMA" SIA EFFETTIVAMENTE IN GRADO DI PRENDERE DALL'ESTERNO QUESTA STRUTTURA.
 
 
@@ -108,16 +109,11 @@ static AppState current_state = STATE_IDLE;
 // Set to 1 when a USB connection is detected.
 uint8_t usb_flag = 0;
 
-// IMU data structures for accelerometer and gyroscope.
-static IMU_Data accelerometer_data;
-static IMU_Data gyroscope_data;
 
-uint8_t raw_accelerometer[6] = {0};
-uint8_t raw_gyroscope[6] = {0};
 
 /// ----- NAND FLASH variables ----- ///
 
-uint8_t NAND_packet[4096] = {0};
+uint16_t NAND_packet[2048] = {0};
 uint16_t sample = 0;
 uint16_t blocco_scritto = 0;
 uint8_t pagina_scritta=0;
@@ -126,10 +122,10 @@ uint16_t b = 0;
 read_address_t blocco;
 column_address_t colonna = 0;
 
-uint16_t bad_blocks[2048]={-1}; // bad blocks array for writing/reading
-uint8_t bad_blocks2[2048]={0}; // bad blocks array for erasing
+uint16_t bad_blocks[1024]={-1}; // bad blocks array for writing/reading
+uint8_t bad_blocks2[1024]={0}; // bad blocks array for erasing
 
-uint8_t data_letto[4096] = {0};
+uint8_t data_letto[2048] = {0};
 int exit_flag = 0;
 
 // Timestamp variables //
@@ -278,12 +274,13 @@ int main(void)
   {
       // 1. Vai in Stop 2 e aspetta un evento (interrupt)
       HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
-
+    
     // 2. Interrupt arrivato, 2 casi
     if (lpbam_cycle_complete) {
         // Caso 1: Il ciclo LPBAM è completo, salvo i dati
         lpbam_cycle_complete = 0; // Resetta la bandierina
-        Elabora_e_Salva_Campionamento_Multiplo(); // Elabora i dati acquisiti e salva in memoria
+        Elabora_e_Salva_Campionamento_Multiplo(pacchetto, time_date); // Elabora i dati acquisiti e salva in memoria
+
         //  Pulisce l'interrupt sul sensore AS7341
 		    // Legge il registro STATUS (0x93) e lo riscrive per pulire il bit AINT
 			  uint8_t status_reg = 0;
@@ -409,6 +406,7 @@ void SystemClock_Config(void)
   * This function is triggered by a hardware timer at a fixed interval.
   * @param  htim: Pointer to the timer handle.
   */
+  /*
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim == &htim2){
@@ -450,7 +448,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 	}
 }
-
+*/
 
 /**
   * @brief  Callback function for external interrupt events (e.g., a button press).

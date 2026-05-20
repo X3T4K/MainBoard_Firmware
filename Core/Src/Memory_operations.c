@@ -6,6 +6,7 @@
  *
  */
 
+#include "stm32u5xx_hal_rtc.h"
 #include "string.h"
 #include "stdio.h"
 #include "stdbool.h"
@@ -70,37 +71,43 @@ void erase_good_blocks(uint8_t *bad_blocks){
 	}
 }
 
-void write_packet(uint16_t sample, Time_Struct timestamp, uint8_t *gyroscope, uint8_t *accelerometer, uint8_t *NAND_packet){
+void write_packet(uint16_t i, Time_Struct time_date, data_packet pacchetto, uint16_t *NAND_packet){
+	
+	int k = time_date.ss;
+	while(k < 5){
+		time_date.ss = 60-(5-k);
+		if (time_date.mm == 0){
+			if(time_date.hh == 0){
+				time_date.hh = 23;
+			}
+			else {
+				time_date.hh = time_date.hh - 1;
+			}
+			time_date.mm = 59;
+		}
+		else {
+			time_date.mm = time_date.mm - 1;
+		}
+		NAND_packet[0 + (i * BYTES_PER_SAMPLE)] = time_date.hh;
+		NAND_packet[1 + (i * BYTES_PER_SAMPLE)] = time_date.mm;
+		NAND_packet[2 + (i * BYTES_PER_SAMPLE)] = time_date.ss;
+		NAND_packet[3 + (i * BYTES_PER_SAMPLE)] = pacchetto.luce_artificiale ;
+		NAND_packet[4 + (i * BYTES_PER_SAMPLE)] = pacchetto.blue;
+		NAND_packet[5 + (i * BYTES_PER_SAMPLE)] = pacchetto.deep_blue;
+		NAND_packet[6 + (i * BYTES_PER_SAMPLE)] = pacchetto.clear;
+		k++;
+		i++;
+	}
 
-	NAND_packet[0 + (sample * BYTES_PER_SAMPLE)] = timestamp.hh;
-	NAND_packet[1 + (sample * BYTES_PER_SAMPLE)] = timestamp.mm;
-	NAND_packet[2 + (sample * BYTES_PER_SAMPLE)] = timestamp.ss;
 
-	uint16_t milli = timestamp.sss;
-	uint8_t m[2];
-	m[0] = milli & 0xff;
-	m[1] = milli >> 8;
-
-	NAND_packet[3 + (sample * BYTES_PER_SAMPLE)] = m[0];
-	NAND_packet[4 + (sample * BYTES_PER_SAMPLE)] = m[1];
-
-	NAND_packet[5 + (sample * BYTES_PER_SAMPLE)] = accelerometer[0];
-	NAND_packet[6 + (sample * BYTES_PER_SAMPLE)] = accelerometer[1];
-	NAND_packet[7 + (sample * BYTES_PER_SAMPLE)] = accelerometer[2];
-	NAND_packet[8 + (sample * BYTES_PER_SAMPLE)] = accelerometer[3];
-	NAND_packet[9 + (sample * BYTES_PER_SAMPLE)] = accelerometer[4];
-	NAND_packet[10 + (sample * BYTES_PER_SAMPLE)] = accelerometer[5];
-
-	NAND_packet[11 + (sample * BYTES_PER_SAMPLE)] = gyroscope[0];
-	NAND_packet[12 + (sample * BYTES_PER_SAMPLE)] = gyroscope[1];
-	NAND_packet[13 + (sample * BYTES_PER_SAMPLE)] = gyroscope[2];
-	NAND_packet[14 + (sample * BYTES_PER_SAMPLE)] = gyroscope[3];
-	NAND_packet[15 + (sample * BYTES_PER_SAMPLE)] = gyroscope[4];
-	NAND_packet[16 + (sample * BYTES_PER_SAMPLE)] = gyroscope[5];
-
+	// Time
+	NAND_packet[0 + (i * BYTES_PER_SAMPLE)] = time_date.hh;
+	NAND_packet[1 + (i * BYTES_PER_SAMPLE)] = time_date.mm;
+	NAND_packet[2 + (i * BYTES_PER_SAMPLE)] = (time_date.ss)-5+i;
+	//Channels
+	NAND_packet[3 + (i * BYTES_PER_SAMPLE)] = pacchetto.luce_artificiale ;
+	NAND_packet[4 + (i * BYTES_PER_SAMPLE)] = pacchetto.blue;
+	NAND_packet[5 + (i * BYTES_PER_SAMPLE)] = pacchetto.deep_blue;
+	NAND_packet[6 + (i * BYTES_PER_SAMPLE)] = pacchetto.clear;
+	
 }
-
-
-
-
-
