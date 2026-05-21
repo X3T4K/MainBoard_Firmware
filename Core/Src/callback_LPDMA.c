@@ -18,7 +18,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
     // Prendiamo il tempo subito
     HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-	time_date={.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+	time_date = (Time_Struct){.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
     uint8_t k = time_date.ss;
     
 

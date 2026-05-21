@@ -77,9 +77,9 @@
 
 /// @brief 
 
-extern data_packet pacchetto;
-extern Time_Struct time_date;
-
+data_packet pacchetto;
+Time_Struct time_date;
+uint16_t nand_offset = 0; // Aggiungi anche questa!
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
 uint8_t AS7341_start_register[1] = {0x93} ; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
@@ -118,9 +118,9 @@ read_address_t blocco;
 column_address_t colonna = 0;
 
 uint16_t bad_blocks[1024]={-1}; // bad blocks array for writing/reading
-uint8_t bad_blocks2[1024]={0}; // bad blocks array for erasing
+uint16_t bad_blocks2[1024]={0}; // bad blocks array for erasing
 
-uint8_t data_letto[2048] = {0};
+uint16_t data_letto[2048] = {0};
 int exit_flag = 0;
 
 // Timestamp variables //
