@@ -28,21 +28,22 @@
 #include "SPI_NAND.h"
 #include "Memory_operations.h"
 #include "../../USB_Device/App/usb_device.h"
+#include <stdint.h>
 
 //extern SPI_HandleTypeDef hspi3;
 extern SPI_HandleTypeDef hspi2;
 
 // extern variables memory
-extern uint8_t NAND_packet[4096];
+extern uint16_t NAND_packet[2048];
 extern uint16_t sample;
 extern uint16_t blocco_scritto;
 extern uint8_t pagina_scritta;
 extern uint16_t b;
-extern uint16_t bad_blocks[2048];
+extern uint16_t bad_blocks[1024];
 extern read_address_t blocco;
 extern column_address_t colonna;
-extern uint8_t bad_blocks2[2048];
-extern uint8_t data_letto[4096];
+extern uint16_t bad_blocks2[1024];
+extern uint16_t data_letto[2048];
 extern int exit_flag;
 
 static AppState current_state;
@@ -123,9 +124,9 @@ int spi_nand_feature_page(void){
 
 	// read form cache
 	column_address_t column =0x00;
-	uint8_t parameters[2048]={0};
-	//uint8_t parameters[4096]={0};
-	ret=read_from_cache(column, parameters, sizeof(parameters), SPI_TIMEOUT);
+	uint16_t parameters[2048]={0};
+	//uint16_t parameters[4096]={0};
+	ret=read_from_cache(column, (uint8_t*)parameters, sizeof(parameters), SPI_TIMEOUT);
 
 	feature_reg_configuration_t data_2 = {.whole = 0};
 	ret=set_feature(FEATURE_REG_CONFIGURATION, data_2.whole, SPI_TIMEOUT);

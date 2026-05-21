@@ -37,7 +37,12 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef struct __attribute__((packed)) {
+    uint16_t luce_artificiale;  // risultato flicker
+    uint16_t deep_blue;  // dati canale deep blue 
+    uint16_t blue;  // dati canale blue 
+    uint16_t clear;   // dati canale clear
+} data_packet;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

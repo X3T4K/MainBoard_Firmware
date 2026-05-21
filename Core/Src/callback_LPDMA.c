@@ -3,22 +3,27 @@
 #include "Memory_operations.h"
 #include <stdint.h>
 
-extern uint16_t NAND_packet[4096];
+extern uint16_t NAND_packet[2048];
 extern uint16_t nand_offset;
 extern data_packet pacchetto;
 extern Time_Struct time_date;
+extern RTC_TimeTypeDef sTime;
+extern RTC_DateTypeDef sDate;
+extern uint8_t AS7341_Rx_Buffer[60];
+extern uint8_t Flicker_buffer[5];
+extern uint8_t real_samples_numb; // Variabile per contare i campioni reali acquisiti in un ciclo.
 
-
-void Elabora_e_Salva_Campionamento_Multiplo( data_packet pacchetto,Time_Struct time_date) 
+void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano sono globali non serve passarle alla funzione
 {
     // Prendiamo il tempo subito
     HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 	time_date={.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
-   
+    uint8_t k = time_date.ss;
+    
 
     // Cicliamo attraverso tutti i campionamenti che LPBAM ha depositato in SRAM4
-    for (uint16_t i = 0; i < NUM_SAMPLES_PER_WAKEUP; i++) {
+    for (uint16_t i = 0; i < real_samples_numb; i++) {
 
         // Calcoliamo l'indice di partenza per il campionamento corrente
         // Al giro 0 parte da 0. Al giro 1 parte da 12. Al giro 2 da 24, ecc.
@@ -100,7 +105,7 @@ void Elabora_e_Salva_Campionamento_Multiplo( data_packet pacchetto,Time_Struct t
             write_memory();
             nand_offset = 0;
         }
-        write_packet(i, time_date, pacchetto, NAND_packet); // Scrive il pacchetto elaborato nel buffer NAND
+        write_packet(i, time_date, pacchetto, NAND_packet, real_samples_numb,k); // Scrive il pacchetto elaborato nel buffer NAND
         nand_offset= nand_offset + 7; // Aggiorna l'offset per il prossimo campione (14 byte per campione: 6 di timestamp + 8 di dati)
         
        // Salva in memoria ogni campione, per sicurezza 
@@ -131,6 +136,5 @@ void Elabora_e_Salva_Campionamento_Multiplo( data_packet pacchetto,Time_Struct t
        
     } // Fine del ciclo for: passa al prossimo campionamento nel buffer SRAM4
 }
-
 
 

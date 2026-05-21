@@ -76,16 +76,9 @@
 /* USER CODE BEGIN PV */
 
 /// @brief 
-typedef struct packed{
-    uint16_t luce_artificiale;  // risultato flicker
-    uint16_t deep_blue;  // dati canale deep blue 
-    uint16_t blue;  // dati canale blue 
-    uint16_t clear;   // dati canale clear
-} data_packet;
-data_packet pacchetto;
-extern Time_Struct time_date;
-// CONTROLLARE CHE QUANDO CHIAMO IL SALVATAGGIO DATI IN "CALLBACK_LPDMA" SIA EFFETTIVAMENTE IN GRADO DI PRENDERE DALL'ESTERNO QUESTA STRUTTURA.
 
+extern data_packet pacchetto;
+extern Time_Struct time_date;
 
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
 uint8_t AS7341_start_register[1] = {0x93} ; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
@@ -94,7 +87,9 @@ uint8_t Flicker_REG[1] = {0xDB};
 
 volatile uint8_t as7341_int_alarm = 0; // interrupt di soglia
 volatile uint8_t lpbam_cycle_complete = 0; // interrupt di fine ciclo
+volatile uint8_t button_force_stop = 0;
 
+uint8_t real_samples_numb=0; // Variabile per contare i campioni reali acquisiti in un ciclo.
 
 // Buffer in SRAM4 per LPBAM/DMA
 __attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[60]; // Buffer per i dati luce blu
@@ -261,8 +256,6 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
-  HAL_DBGMCU_DisableDBGStopMode();
-  __HAL_RCC_PWR_CLK_ENABLE();
   
 
 
@@ -272,33 +265,18 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-      // 1. Vai in Stop 2 e aspetta un evento (interrupt)
-      HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+    // vai in Stop 2 SOLO se non stai lavorando (USB o download)
+    if (current_state == STATE_ACQUISITION) 
+    {   
+        HAL_DBGMCU_DisableDBGStopMode();
+       __HAL_RCC_PWR_CLK_ENABLE();
+        HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+          
+        // Il PLL si spegne in Stop 2. ripristino il clock al risveglio!
+        SystemClock_Config(); 
+        HAL_ResumeTick(); // Ripristina il Systick
+    }  
     
-    // 2. Interrupt arrivato, 2 casi
-    if (lpbam_cycle_complete) {
-        // Caso 1: Il ciclo LPBAM è completo, salvo i dati
-        lpbam_cycle_complete = 0; // Resetta la bandierina
-        Elabora_e_Salva_Campionamento_Multiplo(pacchetto, time_date); // Elabora i dati acquisiti e salva in memoria
-
-        //  Pulisce l'interrupt sul sensore AS7341
-		    // Legge il registro STATUS (0x93) e lo riscrive per pulire il bit AINT
-			  uint8_t status_reg = 0;
-      	// Legge lo stato (e i flag degli interrupt attivi)
-      		HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
-
-      	// Riscrive lo stesso valore. I bit a "1" verranno azzerati dal sensore
-      		HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
-
-     }else if (as7341_int_alarm){
-        // Caso 2: L'interrupt di soglia è arrivato, avverte subito via BLE
-        uint8_t AS7341_TRESHOLD[]={[0]=123, [1]=9, [2]=125}; 
-        BLE_SendData(AS7341_TRESHOLD, sizeof(AS7341_TRESHOLD));
-        printf("[BLE] Soglia superata\n");// invia la notifica attraverso BLE
-        as7341_int_alarm = 0; // Resetta la bandierina
-     }
-
-   
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -312,9 +290,27 @@ int main(void)
 	  		// Check if a USB connection has been detected
 	  		if(!usb_flag)
 		    {
-	  			//MX_USB_Device_Init();
-		    }
-	  		else
+	  			if(button_force_stop==1) // se non sono connesso via USB, ma premo il bottone, entro in acquisition mode
+          {
+            // 1. Leggiamo l'indirizzo di memoria a cui è arrivato l'LPDMA
+            uint32_t current_dma_address = handle_LPDMA1_Channel0.Instance->CDAR;
+
+            // 2. Calcoliamo l'indirizzo di partenza del nostro buffer
+            uint32_t start_buffer_address = (uint32_t)&AS7341_Rx_Buffer[0];
+
+            // 3. Facciamo la sottrazione per ottenere i byte totali EFFETTIVAMENTE trasferiti
+            uint32_t bytes_transferred = current_dma_address - start_buffer_address;
+
+            // 4. Calcoliamo quanti campioni sani da 12 byte abbiamo
+            real_samples_numb = bytes_transferred / AS7341_COLOR_BPS;
+
+            // 5. Elabora i dati acquisiti fino a quel momento (real_samples_numb) e salva in memoria
+            Elabora_e_Salva_Campionamento(); 
+
+          }
+        }
+        //MX_USB_Device_Init();
+		    else
 	  		{
 			   // Transition to the USB_CONNECTED state
 	  		   current_state = STATE_USB_CONNECTED;
@@ -325,6 +321,29 @@ int main(void)
 
 	  	  case STATE_ACQUISITION:
 	  		   // All data acquisition is handled by the timer interrupt
+           // 2. Interrupt arrivato, 2 casi
+          if (lpbam_cycle_complete) {
+              // Caso 1: Il ciclo LPBAM è completo, salvo i dati
+              lpbam_cycle_complete = 0; // Resetta la bandierina
+              real_samples_numb = NUM_SAMPLES_PER_WAKEUP; // so che sono 5 quando chiamo questa
+              Elabora_e_Salva_Campionamento(); // Elabora i dati acquisiti e salva in memoria
+
+              //  Pulisce l'interrupt sul sensore AS7341
+              // Legge il registro STATUS (0x93) e lo riscrive per pulire il bit AINT
+              uint8_t status_reg = 0;
+              // Legge lo stato (e i flag degli interrupt attivi)
+              HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+
+              // Riscrive lo stesso valore. I bit a "1" verranno azzerati dal sensore
+              HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+
+          }else if (as7341_int_alarm){
+              // Caso 2: L'interrupt di soglia è arrivato, avverte subito via BLE
+              uint8_t AS7341_TRESHOLD[]={[0]=123, [1]=9, [2]=125}; 
+              BLE_SendData(AS7341_TRESHOLD, sizeof(AS7341_TRESHOLD));
+              printf("[BLE] Soglia superata\n");// invia la notifica attraverso BLE
+              as7341_int_alarm = 0; // Resetta la bandierina
+          }
 
 			break;
 
@@ -470,8 +489,10 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 			break;
 			case STATE_ACQUISITION:
 				// If data acquisition is active, stop it.
+        button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
 				current_state = STATE_IDLE;
 				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
+
 				LED_Off(LED_GREEN); // Turn off the LED
 				break;
 			case STATE_USB_CONNECTED:
