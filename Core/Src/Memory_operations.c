@@ -89,24 +89,24 @@ void write_packet(uint16_t i, Time_Struct time_date, data_packet pacchetto, uint
 			time_date.mm = time_date.mm - 1;
 		}
 		// Time
-		NAND_packet[0 + (i * BYTES_PER_SAMPLE)] = time_date.hh;
-		NAND_packet[1 + (i * BYTES_PER_SAMPLE)] = time_date.mm;
-		NAND_packet[2 + (i * BYTES_PER_SAMPLE)] = time_date.ss;
+		NAND_packet[0 + (i * BYTES_PER_SAMPLE/2)] = time_date.hh;
+		NAND_packet[1 + (i * BYTES_PER_SAMPLE/2)] = time_date.mm;
+		NAND_packet[2 + (i * BYTES_PER_SAMPLE/2)] = time_date.ss;
 		// Channels
-		NAND_packet[3 + (i * BYTES_PER_SAMPLE)] = pacchetto.luce_artificiale ;
-		NAND_packet[4 + (i * BYTES_PER_SAMPLE)] = pacchetto.blue;
-		NAND_packet[5 + (i * BYTES_PER_SAMPLE)] = pacchetto.deep_blue;
-		NAND_packet[6 + (i * BYTES_PER_SAMPLE)] = pacchetto.clear;
-		k++;
+		NAND_packet[3 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.luce_artificiale ;
+		NAND_packet[4 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.blue;
+		NAND_packet[5 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.deep_blue;
+		NAND_packet[6 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.clear;
+		// spostato k++ direttamente nel ciclo for di callback_LPDMA.c
 	} else {
 	// Time
-	NAND_packet[0 + (i * BYTES_PER_SAMPLE)] = time_date.hh;
-	NAND_packet[1 + (i * BYTES_PER_SAMPLE)] = time_date.mm;
-	NAND_packet[2 + (i * BYTES_PER_SAMPLE)] = (time_date.ss)-samples_numb+i;
+	NAND_packet[0 + (i * BYTES_PER_SAMPLE/2)] = time_date.hh;
+	NAND_packet[1 + (i * BYTES_PER_SAMPLE/2)] = time_date.mm;
+	NAND_packet[2 + (i * BYTES_PER_SAMPLE/2)] = (time_date.ss)-samples_numb+i;
 	//Channels
-	NAND_packet[3 + (i * BYTES_PER_SAMPLE)] = pacchetto.luce_artificiale ;
-	NAND_packet[4 + (i * BYTES_PER_SAMPLE)] = pacchetto.blue;
-	NAND_packet[5 + (i * BYTES_PER_SAMPLE)] = pacchetto.deep_blue;
-	NAND_packet[6 + (i * BYTES_PER_SAMPLE)] = pacchetto.clear;
+	NAND_packet[3 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.luce_artificiale ;
+	NAND_packet[4 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.blue;
+	NAND_packet[5 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.deep_blue;
+	NAND_packet[6 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.clear;
 	}
 }

@@ -23,7 +23,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
     
 
     // Cicliamo attraverso tutti i campionamenti che LPBAM ha depositato in SRAM4
-    for (uint16_t i = 0; i < real_samples_numb; i++) {
+    for (uint16_t i = 0; i < real_samples_numb; i++, k++) {
 
         // Calcoliamo l'indice di partenza per il campionamento corrente
         // Al giro 0 parte da 0. Al giro 1 parte da 12. Al giro 2 da 24, ecc.
