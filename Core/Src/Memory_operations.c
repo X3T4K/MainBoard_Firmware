@@ -6,7 +6,7 @@
  *
  */
 
-#include "stm32u5xx_hal_rtc.h"
+
 #include "string.h"
 #include "stdio.h"
 #include "stdbool.h"
