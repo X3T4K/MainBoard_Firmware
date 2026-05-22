@@ -101,6 +101,11 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
         pacchetto.deep_blue = (uint16_t)(temp_deep_blue >> (current_gain-1));
         pacchetto.clear = (uint16_t)(temp_clear >> (current_gain-1));
         
+        //for debug
+        printf("Campione %d: Gain=%d, DeepBlue=%d, Blue=%d, Clear=%d, Luce Artificiale=%d\n", i, current_gain, pacchetto.deep_blue, pacchetto.blue, pacchetto.clear, pacchetto.luce_artificiale);
+
+
+
         if (nand_offset >= 2048) {
             write_memory();
             nand_offset = 0;
