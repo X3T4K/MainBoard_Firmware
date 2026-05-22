@@ -24,7 +24,7 @@
 
 /* USER CODE END 0 */
 
-RTC_HandleTypeDef hrtc;
+
 
 /* RTC init function */
 void MX_RTC_Init(void)
