@@ -43,7 +43,7 @@ static uint8_t     rx_temp_buf[64];          // buffer di accumulo
 static uint8_t     rx_temp_idx  = 0;
 static BLE_RxState rx_state     = RX_STATE_IDLE;
 
-static uint8_t          rx_data_packet[5];
+static uint8_t          rx_data_packet[16];
 uint8_t rx_data_len;
 static char             rx_status_msg[64];
 static volatile uint8_t rx_data_ready   = 0;
@@ -400,26 +400,31 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 void BLE_ProcessRxBuffer(void) {
     if (rx_data_ready) {
         rx_data_ready = 0;
-        //Caso ACK, Rispondo con un contro ACK per confermare la ricezione del pacchetto
+        
+        // Caso ACK (6)
         if (rx_data_packet[1] == 6) {
             uint8_t ack_packet[] = {123, 7, 125};
             BLE_SendData(ack_packet, sizeof(ack_packet));
             printf("[BLE] ACK inviato\n");
-        // Caso ENQ_S, il dispositivo esterno sta chiedendo di iniziare la trasmissione dei dati spettrometro
-        } else if (rx_data_packet[1] == 4) {
-            read_spectrumData_and_BLE_transmit();
-            printf("[BLE] ENQ_S ricevuto, inizio trasmissione dati...\n");
-        // Caso ENQ_M, il dispositivo esterno sta chiedendo di iniziare la trasmissione dei dati microfono
-        } else if (rx_data_packet[1] == 5) {
-            read_micData_and_BLE_transmit();
-            printf("[BLE] ENQ_M ricevuto, inizio trasmissione dati...\n");
+        }
+        // --- NUOVO: Caso Request Page ('P' / 80) ---
+        else if (rx_data_packet[1] == 80) { // 'P' in ASCII
+            // Ricostruiamo l'intero a 24-bit dai 3 byte ricevuti
+            uint32_t requested_page = (rx_data_packet[2] << 16) | 
+                                      (rx_data_packet[3] << 8)  | 
+                                       rx_data_packet[4];
+            
+            printf("[BLE] Ricevuta richiesta per pagina assoluta: %lu\n", requested_page);
+            
+            // Richiama la funzione di trasmissione che abbiamo strutturato in precedenza
+            BLE_Transmit_NAND_Page(requested_page);
         }
     }
+    
     if (rx_status_ready) {
 
         printf("[BLE STATUS] %s\n", rx_status_msg);
         rx_status_ready = 0;
-
        if(strstr(rx_status_msg, "DISCONNECT")) {
             ble_connection_status = BLE_DISCONNECTED;
             printf("[BLE] Disconnesso\n");
@@ -440,9 +445,9 @@ void BLE_ProcessRxBuffer(void) {
             waiting_for_stream = false;
             BLE_HardReset(); // Forza il modulo a tornare in Advertising
         }
-}
     }
 }
+
 
 void read_spectrumData_and_BLE_transmit(){
 
@@ -450,4 +455,124 @@ void read_spectrumData_and_BLE_transmit(){
 
 void read_micData_and_BLE_transmit(){
 
+}
+
+
+// --- Funzioni per trasmissione dati da NAND ---
+
+
+#define BLE_MAX_PAYLOAD 151
+#define TYPE_DATA 0x44 // 'D'
+#define TYPE_EOP  0x45 // 'E'
+#define TYPE_EOD  0x46 // 'F' - Finished/End Of Dump
+
+// Funzione helper per inviare un chunk formattato
+void BLE_SendChunk(uint8_t type, uint8_t *payload, uint16_t length) {
+    uint8_t packet[158]; 
+    uint16_t packet_idx = 0;
+
+    packet[packet_idx++] = '{';
+    packet[packet_idx++] = type;
+    packet[packet_idx++] = (length >> 8) & 0xFF;
+    packet[packet_idx++] = length & 0xFF;
+
+    memcpy(&packet[packet_idx], payload, length);
+    packet_idx += length;
+
+    uint16_t crc16 = BLE_CalculateCRC16(payload, length);
+    packet[packet_idx++] = (crc16 >> 8) & 0xFF;
+    packet[packet_idx++] = crc16 & 0xFF;
+    packet[packet_idx++] = '}';
+
+    BLE_SendData(packet, packet_idx);
+}
+
+
+void BLE_Transmit_NAND_Page(uint32_t absolute_page) {
+    // 1. Mappatura Logico -> Fisico
+    uint16_t logical_block = absolute_page / 64;
+    uint8_t physical_page = absolute_page % 64;
+    
+    // 2. Controllo Limiti di Sicurezza (Memoria Finita o End Of Partition)
+    // Se sforiamo l'array o becchiamo un blocco non inizializzato, inviamo l'EOD.
+    if (logical_block >= 2048 || bad_blocks[logical_block] == (uint16_t)-1) {
+        uint8_t dummy = 0;
+        BLE_SendChunk(TYPE_EOD, &dummy, 1);
+        return;
+    }
+
+    read_address_t row;
+    row.block = bad_blocks[logical_block]; 
+    row.page = physical_page;
+    row.dummy = 0;
+
+    column_address_t colonna = 0;
+    spi_nand_page_read(row, colonna, data_letto, 4096);
+
+    // 3. Controllo "Early EOD" (Pagina non ancora scritta)
+    // Una NAND cancellata ha tutti i bit a 1 (0xFF). Controlliamo l'inizio.
+    bool is_empty = true;
+    for(int i = 0; i < 16; i++) {
+        if(data_letto[i] != 0xFF) { 
+            is_empty = false; 
+            break; 
+        }
+    }
+
+    if (is_empty) {
+        printf("[BLE] Pagina vuota trovata a logica %lu. Invio EOD.\n", absolute_page);
+        uint8_t dummy = 0;
+        BLE_SendChunk(TYPE_EOD, &dummy, 1);
+        return;
+    }
+
+    // 4. Se la pagina ha dati, procediamo col normale invio a chunk
+    uint16_t offset = 0;
+    while (offset < 4096) {
+        uint16_t chunk_size = (4096 - offset > BLE_MAX_PAYLOAD) ? BLE_MAX_PAYLOAD : (4096 - offset);
+        BLE_SendChunk(TYPE_DATA, data_letto + offset, chunk_size);
+        offset += chunk_size;
+        HAL_Delay(15); // Da rimuovere se implementi Flow Control Hardware (RTS/CTS)
+    }
+
+    // 5. Invio pacchetto EOP con CRC32
+    uint32_t page_crc32 = BLE_CalculateCRC32(data_letto, 4096);
+    uint8_t eop_payload[4];
+    eop_payload[0] = (page_crc32 >> 24) & 0xFF;
+    eop_payload[1] = (page_crc32 >> 16) & 0xFF;
+    eop_payload[2] = (page_crc32 >> 8) & 0xFF;
+    eop_payload[3] = page_crc32 & 0xFF;
+
+    BLE_SendChunk(TYPE_EOP, eop_payload, 4);
+}
+
+
+uint16_t BLE_CalculateCRC16(uint8_t *data, uint16_t length) {
+    uint16_t crc = 0xFFFF;
+    for (uint16_t i = 0; i < length; i++) {
+        crc ^= (uint16_t)(data[i] << 8);
+        for (uint8_t j = 0; j < 8; j++) {
+            if ((crc & 0x8000) != 0) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc <<= 1;
+            }
+        }
+    }
+    return crc;
+}
+
+uint32_t BLE_CalculateCRC32(uint8_t *data, uint16_t length) {
+    uint32_t crc = 0xFFFFFFFF;
+    for (uint16_t i = 0; i < length; i++) {
+        crc ^= data[i];
+        for (uint8_t j = 0; j < 8; j++) {
+            if ((crc & 1) != 0) {
+                crc = (crc >> 1) ^ 0xEDB88320;
+            } else {
+                crc >>= 1;
+            }
+        }
+    }
+    return crc ^ 0xFFFFFFFF;
 }

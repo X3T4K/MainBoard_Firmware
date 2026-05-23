@@ -718,33 +718,63 @@ int spi_write(uint8_t *write_buff, size_t write_len, uint32_t timeout_ms)
 
 void write_memory()
 {
-	if(sample == SAMPLES_PER_PAGE){ // Arrived at the end of the page
+    if(sample == SAMPLES_PER_PAGE){ // Arrivato alla fine della pagina RAM
 
-		sample = 0;
+        sample = 0;
+        bool write_success = false;
 
-		if(pagina_scritta >= 64){ // End of the block, increment block
-			pagina_scritta = 0;
-			b++;
-		}
+        // Ciclo di tentativo scrittura: se il blocco fallisce, passa al successivo in tempo reale
+        while (!write_success) {
+            
+            if(pagina_scritta >= 64){ // Fine del blocco corrente, passa al prossimo indice della LUT
+                pagina_scritta = 0;
+                b++;
+            }
 
-		if(b==2048){ // memory full
-			current_state = STATE_IDLE;
-		}
+            // Controllo reale di memoria piena basato sui blocchi sani effettivi
+            if(b >= 2048 || bad_blocks[b] == (uint16_t)-1){ 
+                current_state = STATE_IDLE;
+                HAL_TIM_Base_Stop_IT(&htim2); // Ferma il timer di campionamento IMU
+                printf("[NAND] Memoria Flash Esaurita!\n");
+                break;
+            }
 
-		// write 1 page at the time
-		blocco_scritto = bad_blocks[b];
-		blocco.block = blocco_scritto;
-		blocco.page = pagina_scritta;
-		blocco.dummy = 0;
-		colonna = 0;
+            blocco_scritto = bad_blocks[b];
+            blocco.block = blocco_scritto;
+            blocco.page = pagina_scritta;
+            blocco.dummy = 0;
+            colonna = 0;
 
-		spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
+            // Esegui la scrittura e controlla il flag hardware di successo
+            int ret = spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
 
-		pagina_scritta++;
+            if (ret == SPI_NAND_RET_OK) {
+                // Scrittura avvenuta con successo
+                write_success = true;
+                pagina_scritta++;
+            } 
+            else if (ret == SPI_NAND_RET_P_FAIL) {
+                // Il blocco hardware ha ceduto a runtime.
+                printf("[NAND] CRITICO: P_FAIL sul blocco fisco %d! Salto al blocco successivo...\n", blocco_scritto);
+                
+                // Forza il passaggio immediato al prossimo blocco sano della LUT
+                b++; 
+                pagina_scritta = 0;
+                
+                // Il ciclo while ripeterà il tentativo usando lo stesso NAND_packet sulla pagina 0 del nuovo blocco
+            } 
+            else {
+                // Errore di comunicazione SPI grave (es. timeout hardware del bus)
+                printf("[NAND] Errore di comunicazione SPI: %d. Abort scrittura.\n", ret);
+                current_state = STATE_IDLE;
+                HAL_TIM_Base_Stop_IT(&htim2);
+                break;
+            }
+        }
 
-		memset(NAND_packet, 0, sizeof(NAND_packet));
-	}
-
+        // Solo dopo una scrittura riuscita (o abort) puliamo il pacchetto per i nuovi campionamenti
+        memset(NAND_packet, 0, sizeof(NAND_packet));
+    }
 }
 
 void read_memory_and_transmit()
