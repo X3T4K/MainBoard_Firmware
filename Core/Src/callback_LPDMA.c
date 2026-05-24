@@ -8,8 +8,6 @@ extern uint16_t NAND_packet[2048];
 extern uint16_t nand_offset;
 extern data_packet pacchetto;
 extern Time_Struct time_date;
-extern RTC_TimeTypeDef sTime;
-extern RTC_DateTypeDef sDate;
 extern uint8_t AS7341_Rx_Buffer[60];
 extern uint8_t Flicker_buffer[5];
 extern uint8_t real_samples_numb; // Variabile per contare i campioni reali acquisiti in un ciclo.
@@ -17,6 +15,10 @@ extern uint16_t sample; // Variabile globale per tenere traccia del campione cor
 
 void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano sono globali non serve passarle alla funzione
 {
+    
+    RTC_TimeTypeDef sTime = {0};
+    RTC_DateTypeDef sDate = {0};
+
     // Prendiamo il tempo subito
     HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
 	HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
