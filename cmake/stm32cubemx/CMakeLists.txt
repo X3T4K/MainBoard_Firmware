@@ -45,7 +45,8 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/syscalls.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32u575xx.s
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/callback_LPDMA.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/Spec_AS7341.c   
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/Spec_AS7341.c 
+   
     
 )
 

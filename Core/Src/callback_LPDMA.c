@@ -2,6 +2,7 @@
 #include "main.h"
 #include "Memory_operations.h"
 #include <stdint.h>
+#include "rtc.h"
 
 extern uint16_t NAND_packet[2048];
 extern uint16_t nand_offset;
@@ -12,6 +13,7 @@ extern RTC_DateTypeDef sDate;
 extern uint8_t AS7341_Rx_Buffer[60];
 extern uint8_t Flicker_buffer[5];
 extern uint8_t real_samples_numb; // Variabile per contare i campioni reali acquisiti in un ciclo.
+extern uint16_t sample; // Variabile globale per tenere traccia del campione corrente da elaborare/salvare
 
 void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano sono globali non serve passarle alla funzione
 {
@@ -23,7 +25,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
     
 
     // Cicliamo attraverso tutti i campionamenti che LPBAM ha depositato in SRAM4
-    for (uint16_t i = 0; i < real_samples_numb; i++, k++) {
+    for (uint16_t i = 0 ; i < real_samples_numb; i++, k++) {
 
         // Calcoliamo l'indice di partenza per il campionamento corrente
         // Al giro 0 parte da 0. Al giro 1 parte da 12. Al giro 2 da 24, ecc.
@@ -41,7 +43,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
             uint8_t valid_120 = 0; 
             uint8_t saturation_flicker = 0; 
             uint8_t flicker_measure_valid = 0; 
-            uint8_t luce_artificiale = 0;
+            
 
     	if(Flicker_buffer[flick_idx] & 0x01){
              flicker_100 = 1; 
@@ -105,6 +107,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
         printf("Campione %d: Gain=%d, DeepBlue=%d, Blue=%d, Clear=%d, Luce Artificiale=%d\n", i, current_gain, pacchetto.deep_blue, pacchetto.blue, pacchetto.clear, pacchetto.luce_artificiale);
 
 
+        // --- 4. SALVATAGGIO IN NAND ---
 
         if (nand_offset >= 2048) {
             write_memory();
@@ -112,11 +115,21 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
         }
         write_packet(i, time_date, pacchetto, NAND_packet, real_samples_numb,k); // Scrive il pacchetto elaborato nel buffer NAND
         nand_offset= nand_offset + 7; // Aggiorna l'offset per il prossimo campione (14 byte per campione: 6 di timestamp + 8 di dati)
-        
+        sample += 1; // Aggiorna il contatore del campione globale, per tenere traccia di quanti campioni abbiamo scritto in totale (non solo in questo ciclo)
        // Salva in memoria ogni campione, per sicurezza 
+          
+    } // Fine del ciclo for: passa al prossimo campionamento nel buffer SRAM4
+}
 
-        // --- 4. SALVATAGGIO IN NAND ---
-        /*
+
+
+
+
+
+
+
+ // ---  SALVATAGGIO IN NAND ALTERNATIVO ---
+/*
         memcpy(&NAND_packet[nand_offset], &paccheto.deep_blue, sizeof(uint16_t));
         nand_offset += sizeof(uint16_t);
 
@@ -136,10 +149,4 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
             write_memory();
             nand_offset = 0;
         }
-        */
-        
-       
-    } // Fine del ciclo for: passa al prossimo campionamento nel buffer SRAM4
-}
-
-
+*/

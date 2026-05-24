@@ -739,7 +739,7 @@ void write_memory()
 		blocco.dummy = 0;
 		colonna = 0;
 
-		spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
+		spi_nand_page_program(blocco, colonna, NAND_packet, sizeof(NAND_packet));
 
 		pagina_scritta++;
 
@@ -750,7 +750,7 @@ void write_memory()
 
 void read_memory_and_transmit()
 {
-		for(int bloc = 0; bloc < 2048; bloc++) { // Cycle on all the memory blocks (2048)
+		for(int bloc = 0; bloc < 1024; bloc++) { // Cycle on all the memory blocks (1024)
 			if(exit_flag == 0){
 			blocco.block = bad_blocks[bloc]; // Read only good blocks
 
@@ -760,7 +760,7 @@ void read_memory_and_transmit()
 			// Save data of the page into data_letto
 			spi_nand_page_read(blocco, colonna, data_letto, sizeof(data_letto));
 
-			if(data_letto[0] == 255) {
+			if(data_letto[0] == 65535){ // If the first element is 65535 (0xFFFF) it means that the page is empty, so we can stop reading
 				// in this case exit condition is if the first element is 255 but can be adapted
 				// for example you can store the #block and #page that you have written and read until those #
 				current_state = STATE_USB_CONNECTED;

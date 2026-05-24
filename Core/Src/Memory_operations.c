@@ -37,7 +37,7 @@ void find_bad_blocks(uint16_t *bad_blocks){
 	blocco.dummy=0;
 	bool is_bad_mark=true;
 	int j = 0;
-	for(int i = 0; i<2048; i++){
+	for(int i = 0; i<1024; i++){
 		blocco.block=i;
 		spi_nand_block_is_bad(blocco, &is_bad_mark);
 		/*
@@ -53,13 +53,13 @@ void find_bad_blocks(uint16_t *bad_blocks){
 }
 
 // Questo da tenere così
-void erase_good_blocks(uint8_t *bad_blocks){
+void erase_good_blocks(uint16_t *bad_blocks){
 	read_address_t blocco;
 	blocco.block=0;
 	blocco.page=0;
 	blocco.dummy=0;
 	bool is_bad_mark=true;
-	for(int i = 0; i<2048; i++){
+	for(int i = 0; i<1024; i++){
 		blocco.block=i;
 		spi_nand_block_is_bad(blocco, &is_bad_mark);
 		if(is_bad_mark){
