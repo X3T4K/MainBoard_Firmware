@@ -70,12 +70,11 @@
 I2C_HandleTypeDef hi2c3;
 DMA_HandleTypeDef handle_LPDMA1_Channel0;
 LPTIM_HandleTypeDef hlptim1;
-
 /* USER CODE BEGIN PV */
 
 uint16_t audio_buffer[AUDIO_SAMPLES];    
-float32_t rms_value;
-float32_t dbfs_value;
+float_t rms_value;
+float_t dbfs_value;
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
 uint8_t AS7341_start_register = 0x95; 
@@ -172,11 +171,13 @@ int main(void)
   MX_I2C3_Init();
   MX_LPTIM1_Init();
   MX_ICACHE_Init();
-  MX_MDF1_Init();  MX_SPI2_Init();
+  MX_MDF1_Init();
+  MX_SPI2_Init();
   MX_SPI3_Init();
   MX_TIM2_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 
   // Turn the RED LED on to indicate the start of the initialization process

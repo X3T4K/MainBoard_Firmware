@@ -52,8 +52,8 @@ void MX_MDF1_Init(void)
   MdfHandle0.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
   MdfHandle0.Init.CommonParam.OutputClock.Divider = 5;
   MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_FALLING_EDGE;
+  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
+  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
   MdfHandle0.Init.SerialInterface.Activation = ENABLE;
   MdfHandle0.Init.SerialInterface.Mode = MDF_SITF_NORMAL_SPI_MODE;
   MdfHandle0.Init.SerialInterface.ClockSource = MDF_SITF_CCK0_SOURCE;
@@ -99,8 +99,8 @@ void MX_MDF1_Init(void)
   MdfHandle1.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
   MdfHandle1.Init.CommonParam.OutputClock.Divider = 5;
   MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_FALLING_EDGE;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
   MdfHandle1.Init.SerialInterface.Activation = DISABLE;
   if (HAL_MDF_Init(&MdfHandle1) != HAL_OK)
   {
