@@ -255,7 +255,8 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Init();                              // Inizializza il tuo scenario
   MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
-  MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
+  MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0); 
+  HAL_LPTIM_IC_Start(&hlptim1, LPTIM_CHANNEL_1);      // Avvia il timer che sincronizza l'acquisizione
   
 
 
@@ -306,7 +307,8 @@ int main(void)
 
             // 5. Elabora i dati acquisiti fino a quel momento (real_samples_numb) e salva in memoria
             Elabora_e_Salva_Campionamento(); 
-
+            flush_nand_memory(nand_offset); // forza la scrittura in memoria di quello che c'è nel buffer NAND, anche se non è pieno
+            button_force_stop = 0; // resetto la bandierina per il bottone
           }
         }
         //MX_USB_Device_Init();
