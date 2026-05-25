@@ -463,7 +463,6 @@ void Calculate_dB(uint16_t *buffer, uint16_t size) {
     }
 }
 
-
 // Callback per il rilevamento di eventi di stress acustico (SCD)
 void HAL_MDF_ErrorCallback(MDF_HandleTypeDef *hmdf)
 {
@@ -471,12 +470,17 @@ void HAL_MDF_ErrorCallback(MDF_HandleTypeDef *hmdf)
     {
         // 1. Accendi il LED di allerta
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
-
-        HAL_Delay(100); // Mantieni il LED acceso per 100 ms
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
         
-        // 2. Fai partire una cattura rapida di campioni col Filtro 0
-        //HAL_MDF_SincFilter_Start_DMA(MdfHandle0, &audio_buffer[0], AUDIO_SAMPLES);
+        // 2. Fai partire una cattura rapida di campioni col Filtro 0  
+        MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
+        mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
+        mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
+        mdfDmaConfig0.MsbOnly    = DISABLE;
+        if (HAL_MDF_AcqStart_DMA(&MdfHandle1, &mdfDmaConfig0) != HAL_OK)
+        {
+            Error_Handler();
+        }
+      
     }
 }
 
