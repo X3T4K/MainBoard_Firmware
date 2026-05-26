@@ -115,7 +115,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
             write_memory();
             nand_offset = 0;
         }
-        write_packet(i, time_date, pacchetto, NAND_packet, real_samples_numb,k); // Scrive il pacchetto elaborato nel buffer NAND
+        write_packet(nand_offset / 7, i, time_date, pacchetto, NAND_packet, real_samples_numb, k); // Scrive il pacchetto elaborato nel buffer NAND
         nand_offset= nand_offset + 7; // Aggiorna l'offset per il prossimo campione (14 byte per campione: 6 di timestamp + 8 di dati)
         sample += 1; // Aggiorna il contatore del campione globale, per tenere traccia di quanti campioni abbiamo scritto in totale (non solo in questo ciclo)
        // Salva in memoria ogni campione, per sicurezza 

@@ -476,7 +476,7 @@ int program_load(column_address_t column, const uint8_t *data_in, size_t write_l
 
     int ret = spi_write(tx_data, 3, timeout);
     if (SPI_NAND_RET_OK == ret) {
-        ret = spi_write(data_in, write_len, timeout);
+        ret = spi_write((uint8_t*)data_in, write_len, timeout);
     }
 
     cs_deselect();
@@ -719,33 +719,27 @@ int spi_write(uint8_t *write_buff, size_t write_len, uint32_t timeout_ms)
 
 void write_memory()
 {
-	if(sample == SAMPLES_PER_PAGE){ // Arrived at the end of the page
-
-		sample = 0;
-
-		if(pagina_scritta >= 64){ // End of the block, increment block
-			pagina_scritta = 0;
-			b++;
-		}
-
-		if(b==2048){ // memory full
-			current_state = STATE_IDLE;
-		}
-
-		// write 1 page at the time
-		blocco_scritto = bad_blocks[b];
-		blocco.block = blocco_scritto;
-		blocco.page = pagina_scritta;
-		blocco.dummy = 0;
-		colonna = 0;
-
-		spi_nand_page_program(blocco, colonna, NAND_packet, sizeof(NAND_packet));
-
-		pagina_scritta++;
-
-		memset(NAND_packet, 0, sizeof(NAND_packet));
+	if(pagina_scritta >= 64){ // End of the block, increment block
+		pagina_scritta = 0;
+		b++;
 	}
 
+	if(b==2048){ // memory full
+		current_state = STATE_IDLE;
+	}
+
+	// write 1 page at the time
+	blocco_scritto = bad_blocks[b];
+	blocco.block = blocco_scritto;
+	blocco.page = pagina_scritta;
+	blocco.dummy = 0;
+	colonna = 0;
+
+	spi_nand_page_program(blocco, colonna, (uint8_t*)NAND_packet, sizeof(NAND_packet));
+
+	pagina_scritta++;
+
+	memset(NAND_packet, 0, sizeof(NAND_packet));
 }
 
 void read_memory_and_transmit()
@@ -758,7 +752,7 @@ void read_memory_and_transmit()
 			blocco.page = pag;
 			colonna = 0;
 			// Save data of the page into data_letto
-			spi_nand_page_read(blocco, colonna, data_letto, sizeof(data_letto));
+			spi_nand_page_read(blocco, colonna, (uint8_t*)data_letto, sizeof(data_letto));
 
 			if(data_letto[0] == 65535){ // If the first element is 65535 (0xFFFF) it means that the page is empty, so we can stop reading
 				// in this case exit condition is if the first element is 255 but can be adapted
@@ -772,7 +766,7 @@ void read_memory_and_transmit()
 				break; // exit cycle
 			}
 
-			CDC_Transmit_FS(data_letto, sizeof(data_letto)); // Send data via USB
+			CDC_Transmit_FS((uint8_t*)data_letto, sizeof(data_letto)); // Send data via USB
 			HAL_Delay(10); // wait some time
 		}
 		}
@@ -783,6 +777,5 @@ void erase_memory()
 {
 	erase_good_blocks(bad_blocks2); // Erase bad_blocks (set all memory to 0xFF)
 }
-
 
 

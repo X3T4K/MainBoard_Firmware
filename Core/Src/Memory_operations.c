@@ -72,7 +72,7 @@ void erase_good_blocks(uint16_t *bad_blocks){
 	}
 }
 
-void write_packet(uint16_t i, Time_Struct time_date, data_packet pacchetto, uint16_t *NAND_packet,uint8_t samples_numb, uint8_t k) {
+void write_packet(uint16_t page_sample_idx, uint16_t cycle_sample_idx, Time_Struct time_date, data_packet pacchetto, uint16_t *NAND_packet, uint8_t samples_numb, uint8_t k) {
 	
 	if(k < samples_numb){  // ora è un if perchè essendo dentro il 	for  la chiamata, di base scorre, non serve il while.
 		time_date.ss = 60-(samples_numb-k-1); //correezione per tempo esatto, prima non arrivava al tempo dell'ultima misura.
@@ -89,24 +89,24 @@ void write_packet(uint16_t i, Time_Struct time_date, data_packet pacchetto, uint
 			time_date.mm = time_date.mm - 1;
 		}
 		// Time
-		NAND_packet[0 + (i * BYTES_PER_SAMPLE/2)] = time_date.hh;
-		NAND_packet[1 + (i * BYTES_PER_SAMPLE/2)] = time_date.mm;
-		NAND_packet[2 + (i * BYTES_PER_SAMPLE/2)] = time_date.ss;
+		NAND_packet[0 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = time_date.hh;
+		NAND_packet[1 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = time_date.mm;
+		NAND_packet[2 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = time_date.ss;
 		// Channels
-		NAND_packet[3 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.luce_artificiale ;
-		NAND_packet[4 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.blue;
-		NAND_packet[5 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.deep_blue;
-		NAND_packet[6 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.clear;
+		NAND_packet[3 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.luce_artificiale ;
+		NAND_packet[4 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.blue;
+		NAND_packet[5 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.deep_blue;
+		NAND_packet[6 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.clear;
 		// spostato k++ direttamente nel ciclo for di callback_LPDMA.c
 	} else {
-	// Time
-	NAND_packet[0 + (i * BYTES_PER_SAMPLE/2)] = time_date.hh;
-	NAND_packet[1 + (i * BYTES_PER_SAMPLE/2)] = time_date.mm;
-	NAND_packet[2 + (i * BYTES_PER_SAMPLE/2)] = (time_date.ss)-samples_numb+i;
-	//Channels
-	NAND_packet[3 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.luce_artificiale ;
-	NAND_packet[4 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.blue;
-	NAND_packet[5 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.deep_blue;
-	NAND_packet[6 + (i * BYTES_PER_SAMPLE/2)] = pacchetto.clear;
+		// Time
+		NAND_packet[0 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = time_date.hh;
+		NAND_packet[1 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = time_date.mm;
+		NAND_packet[2 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = (time_date.ss)-samples_numb+cycle_sample_idx;
+		//Channels
+		NAND_packet[3 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.luce_artificiale ;
+		NAND_packet[4 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.blue;
+		NAND_packet[5 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.deep_blue;
+		NAND_packet[6 + (page_sample_idx * BYTES_PER_SAMPLE/2)] = pacchetto.clear;
 	}
 }

@@ -191,7 +191,7 @@ void MX_I2C_Spec_I2C_RX_Start(DMA_HandleTypeDef *hdma)
   }
 
   /* USER CODE BEGIN I2C_Spec_I2C_RX_Start */
-
+  HAL_LPTIM_PWM_Start(&hlptim1, LPTIM_CHANNEL_1);
   /* USER CODE END I2C_Spec_I2C_RX_Start */
 }
 
@@ -220,7 +220,7 @@ void MX_I2C_Spec_I2C_RX_Stop(DMA_HandleTypeDef *hdma)
   }
 
   /* USER CODE BEGIN I2C_Spec_I2C_RX_Stop */
-
+  HAL_LPTIM_PWM_Stop(&hlptim1, LPTIM_CHANNEL_1);
   /* USER CODE END I2C_Spec_I2C_RX_Stop */
 }
 
@@ -713,7 +713,8 @@ static void MX_Blue_Flick_Acq_Q_UnLink(DMA_HandleTypeDef *hdma)
 static void MX_Blue_Flick_Acq_Q_DMA_TC_Callback(DMA_HandleTypeDef *hdma)
 {
   /* USER CODE BEGIN Blue_Flick_Acq_DMA_TC_Callback */
-
+  extern volatile uint8_t lpbam_cycle_complete;
+  lpbam_cycle_complete = 1;
   /* USER CODE END Blue_Flick_Acq_DMA_TC_Callback */
 }
 
