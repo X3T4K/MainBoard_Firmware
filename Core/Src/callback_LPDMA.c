@@ -117,7 +117,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
 
         // --- 4. SALVATAGGIO IN NAND ---
 
-        if (nand_offset >= 2048) {
+        if (nand_offset > 2041) {
             write_memory();
             nand_offset = 0;
         }

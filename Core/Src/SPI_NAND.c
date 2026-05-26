@@ -43,6 +43,7 @@ extern uint16_t bad_blocks[1024];
 extern read_address_t blocco;
 extern column_address_t colonna;
 extern uint16_t bad_blocks2[1024];
+extern uint16_t total_good_blocks;
 extern uint16_t data_letto[2048];
 extern int exit_flag;
 
@@ -724,8 +725,9 @@ void write_memory()
 		b++;
 	}
 
-	if(b==2048){ // memory full
+	if(b >= total_good_blocks || bad_blocks[b] == 0xFFFF){ // memory full or end of good blocks reached
 		current_state = STATE_IDLE;
+		return;
 	}
 
 	// write 1 page at the time
@@ -744,7 +746,10 @@ void write_memory()
 
 void read_memory_and_transmit()
 {
-		for(int bloc = 0; bloc < 1024; bloc++) { // Cycle on all the memory blocks (1024)
+		for(int bloc = 0; bloc < total_good_blocks; bloc++) { // Cycle only on discovered good blocks
+			if (bad_blocks[bloc] == 0xFFFF) { // Stop reading if invalid block sentinel is reached
+				break;
+			}
 			if(exit_flag == 0){
 			blocco.block = bad_blocks[bloc]; // Read only good blocks
 

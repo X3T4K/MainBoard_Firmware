@@ -26,6 +26,8 @@ NAND_info data;
  * Idea: uso il primo blocco disponibile per salvarmi il blocco e la pagina a cui sono arrivata -> può avere dei problemi.
  */
 
+extern uint16_t total_good_blocks;
+
 void find_bad_blocks(uint16_t *bad_blocks){
 	// inizializzo bad_blocks con -1
 	// metto l'indice del good_block nel vettore
@@ -48,8 +50,13 @@ void find_bad_blocks(uint16_t *bad_blocks){
 		  bad_blocks[j]=i;
 		  j++;
 		}
-
 	}
+	
+	// Pad remaining unpopulated elements of bad_blocks with 0xFFFF (invalid block marker)
+	for (int k = j; k < 1024; k++) {
+		bad_blocks[k] = 0xFFFF;
+	}
+	total_good_blocks = j; // Store the exact count of discovered good blocks
 }
 
 // Questo da tenere così

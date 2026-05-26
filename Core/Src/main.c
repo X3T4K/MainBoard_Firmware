@@ -119,6 +119,7 @@ column_address_t colonna = 0;
 
 uint16_t bad_blocks[1024]={-1}; // bad blocks array for writing/reading
 uint16_t bad_blocks2[1024]={0}; // bad blocks array for erasing
+uint16_t total_good_blocks = 0; // Number of good blocks found at startup
 
 uint16_t data_letto[2048] = {0};
 int exit_flag = 0;
