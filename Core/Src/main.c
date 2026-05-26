@@ -268,7 +268,7 @@ int main(void)
     // vai in Stop 2 SOLO se non stai lavorando (USB o download)
     if (current_state == STATE_ACQUISITION) 
     {   
-        HAL_DBGMCU_DisableDBGStopMode();
+        HAL_DBGMCU_EnableDBGStopMode(); // Keep debug active in Stop mode for ITM/SWO printf
        __HAL_RCC_PWR_CLK_ENABLE();
         HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
           
@@ -307,6 +307,17 @@ int main(void)
             // 5. Elabora i dati acquisiti fino a quel momento (real_samples_numb) e salva in memoria
             Elabora_e_Salva_Campionamento(); 
 
+            // FORCE WRITE THE LAST PARTIAL PAGE TO NAND TO PREVENT DATA LOSS
+            if (nand_offset > 0) {
+                // Pad the remaining of the page with 0xFFFF (erased state markers)
+                for (uint16_t p = nand_offset; p < 2048; p++) {
+                    NAND_packet[p] = 0xFFFF;
+                }
+                write_memory(); // Unconditionally writes the page to physical NAND
+                nand_offset = 0;
+            }
+
+            button_force_stop = 0; // Reset flag to prevent endless loop execution in STATE_IDLE
           }
         }
         //MX_USB_Device_Init();
@@ -325,6 +336,10 @@ int main(void)
           if (lpbam_cycle_complete) {
               // Caso 1: Il ciclo LPBAM è completo, salvo i dati
               lpbam_cycle_complete = 0; // Resetta la bandierina
+
+              // Temporarily pause background LPTIM triggers to avoid I2C bus collision
+              HAL_LPTIM_PWM_Stop(&hlptim1, LPTIM_CHANNEL_1);
+
               real_samples_numb = NUM_SAMPLES_PER_WAKEUP; // so che sono 5 quando chiamo questa
               Elabora_e_Salva_Campionamento(); // Elabora i dati acquisiti e salva in memoria
 
@@ -337,6 +352,8 @@ int main(void)
               // Riscrive lo stesso valore. I bit a "1" verranno azzerati dal sensore
               HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
 
+              // Restart LPTIM triggers once manual I2C communication is complete
+              HAL_LPTIM_PWM_Start(&hlptim1, LPTIM_CHANNEL_1);
           }else if (as7341_int_alarm){
               // Caso 2: L'interrupt di soglia è arrivato, avverte subito via BLE
               uint8_t AS7341_TRESHOLD[]={[0]=123, [1]=9, [2]=125}; 

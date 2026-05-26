@@ -29,6 +29,9 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
     // Cicliamo attraverso tutti i campionamenti che LPBAM ha depositato in SRAM4
     for (uint16_t i = 0 ; i < real_samples_numb; i++, k++) {
 
+        // Reset package flicker status to prevent propagation of stale values from previous iterations
+        pacchetto.luce_artificiale = 0;
+
         // Calcoliamo l'indice di partenza per il campionamento corrente
         // Al giro 0 parte da 0. Al giro 1 parte da 12. Al giro 2 da 24, ecc.
         uint16_t color_idx = i * AS7341_COLOR_BPS;
@@ -36,6 +39,9 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
 
         // --- 1. ESTRAZIONE GAIN (Relativo al campionamento corrente) ---
         uint8_t current_gain = AS7341_Rx_Buffer[color_idx + 1] & 0x0F;
+        if (current_gain == 0 || current_gain > 10) {
+            current_gain = 1; // Default to 1x gain (shift of 0) to prevent underflow or out-of-bounds shift
+        }
 
         // --- 2. ESTRAZIONE DATI FLICKER(Relativo al campionamento corrente) ---
 
