@@ -2,135 +2,126 @@ import numpy as np
 import matplotlib.pyplot as plt
 import serial
 import os
+import struct
 import pandas as pd
 from datetime import datetime
 from tkinter import Tk, filedialog, ttk, messagebox, StringVar, Label, Button
 from serial.tools import list_ports
 
-def convert_16bit_signed(lo, hi):
-    combined = (hi.astype(np.uint16) << 8) | lo.astype(np.uint16)
-    return combined.view(np.int16)
-
-def conv_imu(arr):
-    x = convert_16bit_signed(arr[:,0], arr[:,1]) / (2**15) * 2
-    y = convert_16bit_signed(arr[:,2], arr[:,3]) / (2**15) * 2
-    z = convert_16bit_signed(arr[:,4], arr[:,5]) / (2**15) * 2
-    return x, y, z
-
-def conv_gyro(arr):
-    x = convert_16bit_signed(arr[:,0], arr[:,1]) / (2**15) * 250
-    y = convert_16bit_signed(arr[:,2], arr[:,3]) / (2**15) * 250
-    z = convert_16bit_signed(arr[:,4], arr[:,5]) / (2**15) * 250
-    return x, y, z
-
 def receive_and_save_data(ser, bin_filename, packet_size=4096, max_packets=2048*64):
-    """Riceve pacchetti via seriale e li salva in binario."""
+    """Receives packets via serial COM VCP and saves them to a binary file."""
     with open(bin_filename, 'wb') as f:
         for packet_count in range(max_packets):
             data = ser.read(packet_size)
             if not data:
                 continue
-            if data == b'T':  # terminatore
+            if data == b'T':  # Terminator character compatible with mainboard VCP
                 print("Received Terminator Character.")
                 break
             f.write(data)
-            print(f"📥 Received packet {packet_count+1}")
+            print(f"📥 Received NAND page packet {packet_count+1}")
     ser.close()
     print("📴 Serial COM Port Closed.")
 
 def process_bin_file(bin_filename, csv_filename=None):
-    hh_list, mm_list, ss_list, sss_list = [], [], [], []
-    acc_x_list, acc_y_list, acc_z_list = [], [], []
-    gyro_x_list, gyro_y_list, gyro_z_list = [], [], []
+    """Parses binary NAND data pages and plots spectral intensities and flicker."""
+    hh_list, mm_list, ss_list = [], [], []
+    luce_list = []
+    blue_list, deep_blue_list, clear_list = [], [], []
 
     with open(bin_filename, "rb") as f:
         while True:
             pagina = f.read(4096)
             if len(pagina) < 4096:
                 break
-            # considera solo i primi 4080 byte (4096 - 16 finali inutili)
-            valid_bytes = pagina[:4080]
-            # ogni sottopacchetto 17 byte
-            for i in range(0, len(valid_bytes), 17):
-                subpkt = valid_bytes[i:i+17]
-                if len(subpkt) < 17:
+            
+            # Consider only valid sample bytes (292 samples * 14 bytes = 4088 bytes)
+            valid_bytes = pagina[:4088]
+            
+            # Parse each 14-byte subpacket
+            for i in range(0, len(valid_bytes), 14):
+                subpkt = valid_bytes[i:i+14]
+                if len(subpkt) < 14:
                     continue
-                # timestamp
-                hh = subpkt[0]
-                mm = subpkt[1]
-                ss = subpkt[2]
-                sss = subpkt[3] | (subpkt[4] << 8)
+                
+                # Unpack 7 uint16_t little-endian values:
+                # hh, mm, ss, luce_artificiale, blue, deep_blue, clear
+                hh, mm, ss, luce_art, blue, deep_blue, clear = struct.unpack("<7H", subpkt)
+                
+                # Check for sentinel / padding values (0xFFFF) used at end-of-data
+                if hh == 65535 or mm == 65535 or ss == 65535:
+                    continue  # Ignore padding
+                    
                 hh_list.append(hh)
                 mm_list.append(mm)
                 ss_list.append(ss)
-                sss_list.append(sss)
-                # dati IMU
-                #imu_bytes = np.frombuffer(subpkt[5:], dtype=np.uint8).reshape(2,6)
-                # prima 6 byte = accelerometro
-                acc_arr = np.frombuffer(subpkt[5:11], dtype=np.uint8).reshape(1,6)
-                acc_x, acc_y, acc_z = conv_imu(acc_arr)
-                # successivi 6 byte = giroscopio
-                gyro_arr = np.frombuffer(subpkt[11:17], dtype=np.uint8).reshape(1,6)
-                gx, gy, gz = conv_gyro(gyro_arr)
-                acc_x_list.append(acc_x[0])
-                acc_y_list.append(acc_y[0])
-                acc_z_list.append(acc_z[0])
-                gyro_x_list.append(gx[0])
-                gyro_y_list.append(gy[0])
-                gyro_z_list.append(gz[0])
+                luce_list.append(luce_art)
+                blue_list.append(blue)
+                deep_blue_list.append(deep_blue)
+                clear_list.append(clear)
 
-    # crea DataFrame
+    if not hh_list:
+        print("⚠️ No valid spectral samples found in binary file.")
+        return
+
+    # Create formatted timestamp string
+    time_strings = [f"{h:02d}:{m:02d}:{s:02d}" for h, m, s in zip(hh_list, mm_list, ss_list)]
+
+    # Create pandas DataFrame
     df = pd.DataFrame({
+        "Time": time_strings,
         "hh": hh_list,
         "mm": mm_list,
         "ss": ss_list,
-        "sss": sss_list,
-        "acc_x": acc_x_list,
-        "acc_y": acc_y_list,
-        "acc_z": acc_z_list,
-        "gyro_x": gyro_x_list,
-        "gyro_y": gyro_y_list,
-        "gyro_z": gyro_z_list
+        "luce_artificiale": luce_list,
+        "blue": blue_list,
+        "deep_blue": deep_blue_list,
+        "clear": clear_list
     })
 
-    # plot accelerometro
-    plt.figure(figsize=(15,5))
-    plt.subplot(2,1,1)
-    plt.plot(df.index, df["acc_x"], label="acc_x")
-    plt.plot(df.index, df["acc_y"], label="acc_y")
-    plt.plot(df.index, df["acc_z"], label="acc_z")
-    plt.title("Accelerometer")
-    plt.xlabel("Subpacket index")
-    plt.ylabel("g")
-    plt.legend()
-    plt.grid(True)
-
-    # plot giroscopio
-    plt.subplot(2,1,2)
-    plt.plot(df.index, df["gyro_x"], label="gyro_x")
-    plt.plot(df.index, df["gyro_y"], label="gyro_y")
-    plt.plot(df.index, df["gyro_z"], label="gyro_z")
-    plt.title("Gyroscope")
-    plt.xlabel("Subpacket index")
-    plt.ylabel("deg/s")
-    plt.legend()
-    plt.grid(True)
+    # Plot spectral intensities
+    plt.figure(figsize=(12, 8))
+    
+    # Subplot 1: AS7341 Spectral Channels
+    plt.subplot(2, 1, 1)
+    plt.plot(df.index, df["deep_blue"], label="Deep Blue (F1 - 415nm)", color="#00008B", linewidth=1.5)
+    plt.plot(df.index, df["blue"], label="Blue (F2 - 445nm)", color="#00BFFF", linewidth=1.5)
+    plt.plot(df.index, df["clear"], label="Clear (CH4/F5 - 555nm)", color="#FF8C00", linewidth=1.5)
+    plt.title("AS7341 Spectral Channels Physical Intensity", fontsize=12, fontweight='bold', pad=10)
+    plt.ylabel("Intensity (Scaled Physical Value)", fontsize=10)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend(loc="upper right")
+    
+    # Subplot 2: Artificial Light Detection (Flicker)
+    plt.subplot(2, 1, 2)
+    plt.step(df.index, df["luce_artificiale"], label="Artificial Light Detected", color="#FF0000", where="post", linewidth=1.5)
+    plt.title("Flicker Detection Status (100Hz / 120Hz)", fontsize=12, fontweight='bold', pad=10)
+    plt.ylabel("Status (0=None, 1=Detected)", fontsize=10)
+    plt.xlabel("Sample Index", fontsize=10)
+    plt.ylim(-0.2, 1.2)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend(loc="upper right")
+    
     plt.tight_layout()
     plt.show()
 
-    # salva CSV
+    # Save to CSV
     if csv_filename:
         df.to_csv(csv_filename, index=False)
         print(f"📄 Data saved in CSV: {csv_filename}")
 
 def gui_select_com_and_folder():
-    """Apre una piccola GUI per selezionare COM e cartella."""
+    """Opens a small GUI for selecting the COM port and folder."""
     root = Tk()
-    root.title("IMU Data Logger - Configuration")
+    root.title("Spectral Data Logger - Configuration")
     root.geometry("400x400")
     root.resizable(False, False)
 
-    Label(root, text="🔌 Select the COM Port:", font=("Segoe UI", 10)).pack(pady=5)
+    # Styling
+    style = ttk.Style()
+    style.theme_use("clam")
+
+    Label(root, text="🔌 Select the COM Port:", font=("Segoe UI", 10, "bold")).pack(pady=10)
     
     com_var = StringVar()
     ports = [p.device for p in list_ports.comports()]
@@ -142,22 +133,22 @@ def gui_select_com_and_folder():
     com_box.current(0)
 
     def browse_folder():
-        folder = filedialog.askdirectory(title="📂 Select the folder")
+        folder = filedialog.askdirectory(title="📂 Select the folder to save data")
         if folder:
             folder_var.set(folder)
 
     folder_var = StringVar()
-    Label(root, text="📁 Folder:", font=("Segoe UI", 10)).pack(pady=5)
-    Button(root, text="Select folder...", command=browse_folder).pack()
-    Label(root, textvariable=folder_var, fg="blue", wraplength=350).pack(pady=5)
+    Label(root, text="📁 Destination Folder:", font=("Segoe UI", 10, "bold")).pack(pady=15)
+    Button(root, text="Browse Folder...", command=browse_folder, font=("Segoe UI", 9)).pack()
+    Label(root, textvariable=folder_var, fg="blue", font=("Segoe UI", 9, "italic"), wraplength=350).pack(pady=10)
 
     def confirm():
-        if not folder_var.get() or "Nessuna" in com_var.get():
-            messagebox.showerror("Error", "Select a valid COM Port and a folder.")
+        if not folder_var.get() or "No COM Port" in com_var.get():
+            messagebox.showerror("Error", "Select a valid COM Port and a destination folder.")
             return
         root.destroy()
 
-    Button(root, text="✅ Confirm", command=confirm, bg="#4CAF50", fg="white").pack(pady=10)
+    Button(root, text="✅ Start Download", command=confirm, bg="#4CAF50", fg="white", font=("Segoe UI", 10, "bold"), width=20, height=2).pack(pady=20)
     root.mainloop()
 
     return com_var.get(), folder_var.get()
@@ -172,9 +163,9 @@ def main():
         print("❌ Application Stopped.")
         return
 
-    base_filename = datetime.now().strftime("IMUData_%Y%m%d_%H%M%S")
+    base_filename = datetime.now().strftime("SpectralData_%Y%m%d_%H%M%S")
     bin_filename = os.path.join(save_path, f"{base_filename}.bin")
-    csv_filename = os.path.join(save_path, f"{base_filename}_imu.csv")
+    csv_filename = os.path.join(save_path, f"{base_filename}_spectral.csv")
 
     BAUD_RATE = 250000
 
@@ -187,10 +178,6 @@ def main():
         return
 
     process_bin_file(bin_filename, csv_filename)
-
-# ==============================
-# Entry point
-# ==============================
 
 if __name__ == "__main__":
     main()
