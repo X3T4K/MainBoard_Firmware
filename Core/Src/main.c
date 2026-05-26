@@ -45,6 +45,8 @@
 #include "led_driver.h"
 #include "imu_driver.h"
 #include "bluetooth.h"
+#include "Spec_AS7341.h"
+#include "lpbam_i2c_spec.h"
 
 /* USER CODE END Includes */
 
@@ -67,9 +69,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-I2C_HandleTypeDef hi2c3;
-DMA_HandleTypeDef handle_LPDMA1_Channel0;
-LPTIM_HandleTypeDef hlptim1;
+extern I2C_HandleTypeDef hi2c3;
+extern DMA_HandleTypeDef handle_LPDMA1_Channel0;
+extern LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 uint16_t audio_buffer[AUDIO_SAMPLES];    
@@ -476,7 +478,7 @@ void HAL_MDF_ErrorCallback(MDF_HandleTypeDef *hmdf)
         mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
         mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
         mdfDmaConfig0.MsbOnly    = DISABLE;
-        if (HAL_MDF_AcqStart_DMA(&MdfHandle1, &mdfDmaConfig0) != HAL_OK)
+        if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
         {
             Error_Handler();
         }
