@@ -79,50 +79,55 @@
 
 data_packet pacchetto;
 Time_Struct time_date;
-uint16_t nand_offset = 0; // Aggiungi anche questa!
+
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
 uint8_t AS7341_start_register[1] = {0x93} ; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
 uint8_t Flicker_REG[1] = {0xDB};
 
 volatile uint8_t as7341_int_alarm = 0; // interrupt di soglia
-volatile uint8_t lpbam_cycle_complete = 0; // interrupt di fine ciclo
-volatile uint8_t button_force_stop = 0;
-
-uint8_t real_samples_numb=0; // Variabile per contare i campioni reali acquisiti in un ciclo.
 
 // Buffer in SRAM4 per LPBAM/DMA
 __attribute__((section(".sram4_retention"))) uint8_t AS7341_Rx_Buffer[60]; // Buffer per i dati luce blu
 uint8_t DataBufferOffset = 0; // Offset per leggere i dati luce blu (CH0-CH5) dopo i primi 3 byte di STATUS, ASTATUS e GAIN
 __attribute__((section(".sram4_retention"))) uint8_t Flicker_buffer[5]; // Buffer per i dati del flicker
-// --- State Machine ---
-// The current state of the application. Initial state is IDLE.
-static AppState current_state = STATE_IDLE;
+
+// ==========================================
+// SRAM4 Retention Variables (No Initializers)
+// ==========================================
+__attribute__((section(".sram4_retention"))) AppState current_state;
+__attribute__((section(".sram4_retention"))) uint16_t nand_offset;
+__attribute__((section(".sram4_retention"))) volatile uint8_t lpbam_cycle_complete;
+__attribute__((section(".sram4_retention"))) volatile uint8_t button_force_stop;
+__attribute__((section(".sram4_retention"))) uint8_t real_samples_numb;
+__attribute__((section(".sram4_retention"))) uint16_t NAND_packet[2048];
+__attribute__((section(".sram4_retention"))) uint16_t sample;
+__attribute__((section(".sram4_retention"))) uint16_t blocco_scritto;
+__attribute__((section(".sram4_retention"))) uint8_t pagina_scritta;
+__attribute__((section(".sram4_retention"))) uint16_t b;
+__attribute__((section(".sram4_retention"))) uint16_t bad_blocks[1024];
+__attribute__((section(".sram4_retention"))) uint16_t bad_blocks2[1024];
+__attribute__((section(".sram4_retention"))) uint16_t total_good_blocks;
+__attribute__((section(".sram4_retention"))) int exit_flag;
+
+// Session-scoped circular boundary tracking pointers
+__attribute__((section(".sram4_retention"))) uint16_t session_start_block;
+__attribute__((section(".sram4_retention"))) uint8_t session_start_page;
+__attribute__((section(".sram4_retention"))) uint16_t session_end_block;
+__attribute__((section(".sram4_retention"))) uint8_t session_end_page;
+__attribute__((section(".sram4_retention"))) uint8_t session_active;
 
 // --- Global Flags and Variables ---
 // Flag to indicate a USB connection event.
 // Set to 1 when a USB connection is detected.
 uint8_t usb_flag = 0;
 
-
-
 /// ----- NAND FLASH variables ----- ///
-
-uint16_t NAND_packet[2048] = {0};
-uint16_t sample = 0;
-uint16_t blocco_scritto = 0;
-uint8_t pagina_scritta=0;
-uint16_t b = 0;
 
 read_address_t blocco;
 column_address_t colonna = 0;
 
-uint16_t bad_blocks[1024]={-1}; // bad blocks array for writing/reading
-uint16_t bad_blocks2[1024]={0}; // bad blocks array for erasing
-uint16_t total_good_blocks = 0; // Number of good blocks found at startup
-
 uint16_t data_letto[2048] = {0};
-int exit_flag = 0;
 
 // Timestamp variables //
 Time_Struct timestamp;
@@ -213,6 +218,24 @@ int main(void)
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
+
+  // Cold start initialization for SRAM4 retention variables (NOLOAD)
+  current_state = STATE_IDLE;
+  nand_offset = 0;
+  lpbam_cycle_complete = 0;
+  button_force_stop = 0;
+  real_samples_numb = 0;
+  sample = 0;
+  blocco_scritto = 0;
+  pagina_scritta = 0;
+  b = 0;
+  exit_flag = 0;
+  session_start_block = 0;
+  session_start_page = 0;
+  session_end_block = 0;
+  session_end_page = 0;
+  session_active = 0;
+  memset((void*)NAND_packet, 0, sizeof(NAND_packet));
 
   // Turn the RED LED on to indicate the start of the initialization process
   LED_On(LED_RED);
@@ -500,7 +523,19 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 		switch(current_state) {
 			case STATE_IDLE:
 				// If the device is idle, start data acquisition.
-				erase_memory();
+				// If the previous session wrote some data, circularly advance to the next good block
+				if (pagina_scritta > 0) {
+					b++;
+					if (b >= total_good_blocks || bad_blocks[b] == 0xFFFF) {
+						b = 0;
+					}
+					pagina_scritta = 0;
+				}
+				// Set up session boundary pointers
+				session_start_block = b;
+				session_start_page = pagina_scritta;
+				session_active = 0;
+
 				current_state = STATE_ACQUISITION;
 				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
 				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
