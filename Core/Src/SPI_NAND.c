@@ -728,10 +728,13 @@ int spi_write(uint8_t *write_buff, size_t write_len, uint32_t timeout_ms)
 
 void write_memory()
 {
-	if(pagina_scritta >= 64){ // End of the block, increment block
-		pagina_scritta = 0;
-		b++;
-	}
+	
+		sample = 0;
+
+		if(pagina_scritta >= 64){ // End of the block, increment block
+			pagina_scritta = 0;
+			b++;
+		}
 
 	if(b >= total_good_blocks || bad_blocks[b] == 0xFFFF){ // memory full or end of good blocks reached
 		current_state = STATE_IDLE;
@@ -778,67 +781,46 @@ void write_memory()
 
 	pagina_scritta++;
 
-	memset(NAND_packet, 0, sizeof(NAND_packet));
+		memset(NAND_packet, 0, sizeof(NAND_packet));
+	}
+
 }
 
 void read_memory_and_transmit()
 {
-	if (!session_active) {
-		// Send terminator character 'T' immediately if no session is active
-		uint8_t buffer[1] = { 'T' };
-		while (CDC_Transmit_FS(buffer, sizeof(buffer)) == USBD_BUSY) {
-			HAL_Delay(1);
-		}
-		current_state = STATE_USB_CONNECTED;
-		return;
-	}
+		for(int bloc = 0; bloc < 1024; bloc++) { // Cycle on all the memory blocks (1024)
+			if(exit_flag == 0){
+			blocco.block = bad_blocks[bloc]; // Read only good blocks
 
-	uint16_t curr_b = session_start_block;
-	uint8_t curr_p = session_start_page;
-	exit_flag = 0;
+		for(int pag = 0; pag < 64; pag++) {// Cycle on all pages in each block (64)
+			blocco.page = pag;
+			colonna = 0;
+			// Save data of the page into data_letto
+			spi_nand_page_read(blocco, colonna, data_letto, sizeof(data_letto));
 
-	while (exit_flag == 0) {
-		blocco.block = bad_blocks[curr_b];
-		blocco.page = curr_p;
-		colonna = 0;
+			if(data_letto[0] == 65535){ // If the first element is 65535 (0xFFFF) it means that the page is empty, so we can stop reading
+				// in this case exit condition is if the first element is 255 but can be adapted
+				// for example you can store the #block and #page that you have written and read until those #
+				current_state = STATE_USB_CONNECTED;
 
-		// Save data of the page into data_letto
-		spi_nand_page_read(blocco, colonna, (uint8_t*)data_letto, sizeof(data_letto));
+				uint8_t buffer[1] = { 'T' };  // Termination Char compatible with the PC script
+				CDC_Transmit_FS(buffer, sizeof(buffer));  // Send 1 byte: 'T'
 
-		// Transmit page data via USB VCP with robust busy-polling flow control
-		while (CDC_Transmit_FS((uint8_t*)data_letto, sizeof(data_letto)) == USBD_BUSY) {
-			HAL_Delay(1);
-		}
-
-		// Check if we just processed the last written page of the session
-		if (curr_b == session_end_block && curr_p == session_end_page) {
-			break;
-		}
-
-		// Advance page/block circular pointers
-		curr_p++;
-		if (curr_p >= 64) {
-			curr_p = 0;
-			curr_b++;
-			if (curr_b >= total_good_blocks || bad_blocks[curr_b] == 0xFFFF) {
-				curr_b = 0; // Wrap around to first good block
+				exit_flag = 1;
+				break; // exit cycle
 			}
+
+			CDC_Transmit_FS(data_letto, sizeof(data_letto)); // Send data via USB
+			HAL_Delay(10); // wait some time
+		}
 		}
 	}
-
-	// Send Terminator Char 'T' compatible with PC script
-	uint8_t term_buf[1] = { 'T' };
-	while (CDC_Transmit_FS(term_buf, sizeof(term_buf)) == USBD_BUSY) {
-		HAL_Delay(1);
-	}
-
-	current_state = STATE_USB_CONNECTED;
-	exit_flag = 1;
 }
 
 void erase_memory()
 {
 	erase_good_blocks(bad_blocks2); // Erase bad_blocks (set all memory to 0xFF)
 }
+
 
 

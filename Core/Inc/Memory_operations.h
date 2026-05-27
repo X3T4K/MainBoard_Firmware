@@ -37,6 +37,6 @@ void erase_good_blocks(uint16_t *bad_blocks);
 NAND_info read_memory(int b, NAND_info indice, uint16_t *blocco_letto, uint8_t *pagina_letta, uint16_t bad_blocks[1024], uint8_t *data_letto);
 void write_info(NAND_info segnalibro, uint16_t bad_blocks[1024]);
 NAND_info read_info(uint16_t bad_blocks[1024]);
-void write_packet(uint16_t page_sample_idx, uint16_t cycle_sample_idx, Time_Struct timestamp, data_packet paccheto, uint16_t *NAND_packet, uint8_t samples_numb, uint8_t k);
+void write_packet(uint16_t sample, Time_Struct timestamp, data_packet paccheto, uint16_t *NAND_packet,uint8_t samples_numb, uint8_t k);
 
 #endif /* INC_MEMORY_OPERATIONS_H_ */
