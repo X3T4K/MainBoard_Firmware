@@ -60,4 +60,9 @@ void SPEC_Init(void) {
     // SP_EN (0x02) + WEN (0x08) + PON (0x01) = 0x0B
     // Aggiungiamo FDEN (0x40) -> 0x0B + 0x40 = 0x4B
     SPEC_WriteRegister(SPEC_REG_ENABLE, 0x4B); 
+
+    // Clear any pending interrupt on boot to release the INT pin
+    uint8_t status_reg = 0;
+    HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+    HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY); 
 }

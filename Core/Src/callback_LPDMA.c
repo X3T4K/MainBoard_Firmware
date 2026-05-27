@@ -113,10 +113,19 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
         
         //for debug
         printf("Campione %d: Gain=%d, DeepBlue=%d, Blue=%d, Clear=%d, Luce Artificiale=%d\n", i, current_gain, pacchetto.deep_blue, pacchetto.blue, pacchetto.clear, pacchetto.luce_artificiale);
+        printf("[DEBUG] Raw Bytes: STATUS=0x%02X, ASTATUS=0x%02X, Flicker=0x%02X | CH0=%02X%02X, CH1=%02X%02X, CH2=%02X%02X, CH3=%02X%02X, CH4=%02X%02X\n",
+               AS7341_Rx_Buffer[color_idx + 0],
+               AS7341_Rx_Buffer[color_idx + 1],
+               Flicker_buffer[flick_idx],
+               AS7341_Rx_Buffer[color_idx + 3], AS7341_Rx_Buffer[color_idx + 2],
+               AS7341_Rx_Buffer[color_idx + 5], AS7341_Rx_Buffer[color_idx + 4],
+               AS7341_Rx_Buffer[color_idx + 7], AS7341_Rx_Buffer[color_idx + 6],
+               AS7341_Rx_Buffer[color_idx + 9], AS7341_Rx_Buffer[color_idx + 8],
+               AS7341_Rx_Buffer[color_idx + 11], AS7341_Rx_Buffer[color_idx + 10]);
 
 
         // --- 4. SALVATAGGIO IN NAND ---
-
+        /*
         if (nand_offset > 2041) {
             write_memory();
             nand_offset = 0;
@@ -124,7 +133,7 @@ void Elabora_e_Salva_Campionamento(void) //dato che le variabili che si usano so
         write_packet(nand_offset / 7, i, time_date, pacchetto, NAND_packet, real_samples_numb, k); // Scrive il pacchetto elaborato nel buffer NAND
         nand_offset= nand_offset + 7; // Aggiorna l'offset per il prossimo campione (14 byte per campione: 6 di timestamp + 8 di dati)
         sample += 1; // Aggiorna il contatore del campione globale, per tenere traccia di quanti campioni abbiamo scritto in totale (non solo in questo ciclo)
-       // Salva in memoria ogni campione, per sicurezza 
+       // Salva in memoria ogni campione, per sicurezza */
           
     } // Fine del ciclo for: passa al prossimo campionamento nel buffer SRAM4
 }

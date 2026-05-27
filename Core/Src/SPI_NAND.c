@@ -55,7 +55,7 @@ extern uint16_t session_end_block;
 extern uint8_t session_end_page;
 extern uint8_t session_active;
 
-extern AppState current_state;
+extern volatile AppState current_state;
 
 // SPI basic functions
 void cs_deselect(void);

@@ -81,9 +81,9 @@ data_packet pacchetto;
 Time_Struct time_date;
 
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
-uint8_t AS7341_start_register[1] = {0x93} ; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
+__attribute__((section(".sram4_retention"))) uint8_t AS7341_start_register[1]; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
-uint8_t Flicker_REG[1] = {0xDB};
+__attribute__((section(".sram4_retention"))) uint8_t Flicker_REG[1];
 
 volatile uint8_t as7341_int_alarm = 0; // interrupt di soglia
 
@@ -95,7 +95,7 @@ __attribute__((section(".sram4_retention"))) uint8_t Flicker_buffer[5]; // Buffe
 // ==========================================
 // SRAM4 Retention Variables (No Initializers)
 // ==========================================
-__attribute__((section(".sram4_retention"))) AppState current_state;
+__attribute__((section(".sram4_retention"))) volatile AppState current_state;
 __attribute__((section(".sram4_retention"))) uint16_t nand_offset;
 __attribute__((section(".sram4_retention"))) volatile uint8_t lpbam_cycle_complete;
 __attribute__((section(".sram4_retention"))) volatile uint8_t button_force_stop;
@@ -139,13 +139,6 @@ uint16_t tim = 0;
 void SystemClock_Config(void);
 static void MPU_Config(void);
 /* USER CODE BEGIN PFP */
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
-	// Verifica che l'interrupt provenga dal pin STM32 collegato a INT dell'AS7341
-	// (Sostituisci AS7341_INT_Pin con la macro corretta generata da CubeMX, es. GPIO_PIN_5)
-	if (GPIO_Pin == GPIO_PIN_5) {
-		as7341_int_alarm = 1; // Alza la bandierina! La CPU è sveglia.
-	}
-}
 
 // Callback che scatta quando il DMA ha finito il suo ultimo trasferimento/nodo
 void HAL_DMA_RxCpltCallback(DMA_HandleTypeDef *hdma) {
@@ -235,6 +228,8 @@ int main(void)
   session_end_block = 0;
   session_end_page = 0;
   session_active = 0;
+  AS7341_start_register[0] = 0x93;
+  Flicker_REG[0] = 0xDB;
   memset((void*)NAND_packet, 0, sizeof(NAND_packet));
 
   // Turn the RED LED on to indicate the start of the initialization process
@@ -274,14 +269,25 @@ int main(void)
   LED_Off(LED_RED);
 
   SPEC_Init(); // Inizializza il sensore AS7341
+  uint8_t spec_id = SPEC_ReadRegister(0x92);
+  printf("[BOOT] AS7341 Device ID: 0x%02X (Expected: 0x24 or similar)\n", spec_id);
   // LPBAM I2C Spec Setup
+  __HAL_RCC_LPDMA1_FORCE_RESET();
+  __HAL_RCC_LPTIM1_FORCE_RESET();
+  __HAL_RCC_I2C3_FORCE_RESET();
+  HAL_Delay(10);
+  __HAL_RCC_LPDMA1_RELEASE_RESET();
+  __HAL_RCC_LPTIM1_RELEASE_RESET();
+  __HAL_RCC_I2C3_RELEASE_RESET();
+  
+  extern DMA_QListTypeDef Blue_Flick_Acq_Q;
+  memset(&Blue_Flick_Acq_Q, 0, sizeof(Blue_Flick_Acq_Q)); // removed to avoid undeclared symbol
   MX_I2C_Spec_Init();                                     // Inizializza l'applicazione base
   MX_I2C_Spec_I2C_RX_Init();                              // Inizializza il tuo scenario
   MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
-  
-
+  printf("[BOOT] Initialization completed successfully. Entering main loop...\n");
 
   /* USER CODE END 2 */
 
@@ -294,11 +300,13 @@ int main(void)
     {   
         HAL_DBGMCU_EnableDBGStopMode(); // Keep debug active in Stop mode for ITM/SWO printf
        __HAL_RCC_PWR_CLK_ENABLE();
+        HAL_Delay(100); // Give UART/ITM buffers time to serialize and flush completely before cutting clocks!
         HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
           
         // Il PLL si spegne in Stop 2. ripristino il clock al risveglio!
         SystemClock_Config(); 
         HAL_ResumeTick(); // Ripristina il Systick
+        //printf("[DEBUG] CPU woke up from Stop 2 mode!\n");
     }  
     
     /* USER CODE END WHILE */
@@ -322,14 +330,27 @@ int main(void)
             // 2. Calcoliamo l'indirizzo di partenza del nostro buffer
             uint32_t start_buffer_address = (uint32_t)&AS7341_Rx_Buffer[0];
 
-            // 3. Facciamo la sottrazione per ottenere i byte totali EFFETTIVAMENTE trasferiti
-            uint32_t bytes_transferred = current_dma_address - start_buffer_address;
+            // 3. Facciamo la sottrazione per ottenere i byte totali EFFETTIVAMENTE trasferiti (solo se l'indirizzo è valido)
+            uint32_t bytes_transferred = 0;
+            if (current_dma_address >= start_buffer_address && current_dma_address <= start_buffer_address + sizeof(AS7341_Rx_Buffer)) {
+                bytes_transferred = current_dma_address - start_buffer_address;
+            }
 
             // 4. Calcoliamo quanti campioni sani da 12 byte abbiamo
             real_samples_numb = bytes_transferred / AS7341_COLOR_BPS;
+            
+            printf("[DEBUG] Stop Button: CDAR=0x%08lX, Buffer=0x%08lX, BytesTransferred=%lu, Samples=%d\n",
+                   (unsigned long)current_dma_address, (unsigned long)start_buffer_address,
+                   (unsigned long)bytes_transferred, (int)real_samples_numb);
+
+            if (real_samples_numb > 5) {
+                real_samples_numb = 5; // Limita al massimo a 5 campioni per sicurezza
+            }
 
             // 5. Elabora i dati acquisiti fino a quel momento (real_samples_numb) e salva in memoria
-            Elabora_e_Salva_Campionamento(); 
+            if (real_samples_numb > 0) {
+                Elabora_e_Salva_Campionamento(); 
+            }
 
             // FORCE WRITE THE LAST PARTIAL PAGE TO NAND TO PREVENT DATA LOSS
             if (nand_offset > 0) {
@@ -424,10 +445,12 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMBOOST = RCC_PLLMBOOST_DIV2;
@@ -442,6 +465,9 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /* Enable HSI in Stop mode (HSIKERON) so LPBAM can autonomously request it during Stop 2 sleep! */
+  __HAL_RCC_HSISTOP_ENABLE();
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
@@ -537,6 +563,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				session_active = 0;
 
 				current_state = STATE_ACQUISITION;
+        printf("Starting data acquisition...\n");
 				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
 				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
 			break;
@@ -560,12 +587,17 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 	}
 }
 
-// Falling Edge when User Button is not pressed
+// Falling Edge when User Button is not pressed or Spectrometer triggers
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == USER_BUTTON_Pin)
 	{
 
+	}
+	else if (GPIO_Pin == SP_INT_Pin)
+	{
+		as7341_int_alarm = 1;
+		printf("[DEBUG] Spectrometer EXTI5 Interrupt Fired! (as7341_int_alarm=1)\n");
 	}
 }
 
