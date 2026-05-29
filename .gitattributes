@@ -1,0 +1,21 @@
+# Forza Git a gestire tutti i file di testo con normalizzazione nativa (LF nel repo)
+* text=auto
+
+# Forza specificamente i file di codice sorgente e configurazione a usare LF
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.txt text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+
+# Mantieni i file binari intatti (vengono ignorati dalla conversione del testo)
+*.png binary
+*.jpg binary
+*.elf binary
+*.hex binary
+*.bin binary
