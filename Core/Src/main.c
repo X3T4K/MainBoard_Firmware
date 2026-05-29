@@ -272,13 +272,13 @@ int main(void)
   uint8_t spec_id = SPEC_ReadRegister(0x92);
   printf("[BOOT] AS7341 Device ID: 0x%02X (Expected: 0x24 or similar)\n", spec_id);
   // LPBAM I2C Spec Setup
-  __HAL_RCC_LPDMA1_FORCE_RESET();
+ /* __HAL_RCC_LPDMA1_FORCE_RESET();
   __HAL_RCC_LPTIM1_FORCE_RESET();
   __HAL_RCC_I2C3_FORCE_RESET();
   HAL_Delay(10);
   __HAL_RCC_LPDMA1_RELEASE_RESET();
   __HAL_RCC_LPTIM1_RELEASE_RESET();
-  __HAL_RCC_I2C3_RELEASE_RESET();
+  __HAL_RCC_I2C3_RELEASE_RESET();*/
   
   extern DMA_QListTypeDef Blue_Flick_Acq_Q;
   memset(&Blue_Flick_Acq_Q, 0, sizeof(Blue_Flick_Acq_Q)); // removed to avoid undeclared symbol
@@ -326,24 +326,22 @@ int main(void)
 		    {
 	  			if(button_force_stop==1) // se non sono connesso via USB, ma premo il bottone, entro in acquisition mode
           {
-            // 1. Leggiamo l'indirizzo di memoria a cui è arrivato l'LPDMA
-            uint32_t current_dma_address = handle_LPDMA1_Channel0.Instance->CDAR;
+            // 1. Leggiamo i byte RIMANENTI nel blocco LPDMA corrente dal registro CBR1
+            uint32_t bytes_remaining = handle_LPDMA1_Channel0.Instance->CBR1;
 
-            // 2. Calcoliamo l'indirizzo di partenza del nostro buffer
-            uint32_t start_buffer_address = (uint32_t)&AS7341_Rx_Buffer[0];
+            // 2. Definiamo la dimensione teorica del blocco del canale DMA (es. la dimensione del buffer)
+            uint32_t total_block_size = sizeof(AS7341_Rx_Buffer);
 
-            // 3. Facciamo la sottrazione per ottenere i byte totali EFFETTIVAMENTE trasferiti (solo se l'indirizzo è valido)
+            // 3. Calcoliamo i byte EFFETTIVAMENTE trasferiti per differenza
             uint32_t bytes_transferred = 0;
-            if (current_dma_address >= start_buffer_address && current_dma_address <= start_buffer_address + sizeof(AS7341_Rx_Buffer)) {
-                bytes_transferred = current_dma_address - start_buffer_address;
+            if (bytes_remaining <= total_block_size) {
+                bytes_transferred = total_block_size - bytes_remaining;
             }
 
             // 4. Calcoliamo quanti campioni sani da 12 byte abbiamo
             real_samples_numb = bytes_transferred / AS7341_COLOR_BPS;
             
-            printf("[DEBUG] Stop Button: CDAR=0x%08lX, Buffer=0x%08lX, BytesTransferred=%lu, Samples=%d\n",
-                   (unsigned long)current_dma_address, (unsigned long)start_buffer_address,
-                   (unsigned long)bytes_transferred, (int)real_samples_numb);
+            printf("[DEBUG] Stop Button: Samples=%d\n", (int)real_samples_numb);
 
             if (real_samples_numb > 5) {
                 real_samples_numb = 5; // Limita al massimo a 5 campioni per sicurezza
@@ -355,7 +353,7 @@ int main(void)
             }
 
             // FORCE WRITE THE LAST PARTIAL PAGE TO NAND TO PREVENT DATA LOSS
-            flush_nand_memory(nand_offset);
+            //flush_nand_memory(nand_offset);
 
             button_force_stop = 0; // Reset flag to prevent endless loop execution in STATE_IDLE
           }
@@ -569,6 +567,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
 
 				LED_Off(LED_GREEN); // Turn off the LED
+        printf("Data acquisition stopped by user.\n");
 				break;
 			case STATE_USB_CONNECTED:
 				// If USB is connected, start the download process.
