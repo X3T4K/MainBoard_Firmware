@@ -353,7 +353,7 @@ int main(void)
             }
 
             // FORCE WRITE THE LAST PARTIAL PAGE TO NAND TO PREVENT DATA LOSS
-            //flush_nand_memory(nand_offset);
+            flush_nand_memory(nand_offset);
 
             button_force_stop = 0; // Reset flag to prevent endless loop execution in STATE_IDLE
           }

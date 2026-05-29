@@ -89,7 +89,6 @@ void Elabora_e_Salva_Campionamento(void)
                ch0_raw, ch1_raw, ch2_raw, ch3_raw, ch4_raw);
 
         // --- 6. SALVATAGGIO IN NAND ---
-        /*
         if (nand_offset > 2041) {
             write_memory();
             nand_offset = 0;
@@ -97,6 +96,5 @@ void Elabora_e_Salva_Campionamento(void)
         write_packet(nand_offset, time_date, pacchetto, NAND_packet, real_samples_numb, k, i); 
         nand_offset = nand_offset + 7; 
         sample += 1; 
-        */
     } 
 }
