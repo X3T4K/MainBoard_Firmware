@@ -39,5 +39,6 @@ void write_info(NAND_info segnalibro, uint16_t bad_blocks[1024]);
 NAND_info read_info(uint16_t bad_blocks[1024]);
 void write_packet(uint16_t nand_offset, Time_Struct timestamp, data_packet paccheto, uint16_t *NAND_packet,uint8_t samples_numb, uint8_t k,uint16_t i);
 void flush_nand_memory(uint16_t nand_offset);
+void Debug_Read_And_Print_NAND(void);
 
 #endif /* INC_MEMORY_OPERATIONS_H_ */

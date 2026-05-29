@@ -287,8 +287,10 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0); 
-  printf("[BOOT] Initialization completed successfully. Entering main loop...\n");
+  
+  
 
+  printf("[BOOT] Initialization completed successfully. Entering main loop...\n");
 
 
   /* USER CODE END 2 */
@@ -301,14 +303,22 @@ int main(void)
     if (current_state == STATE_ACQUISITION) 
     {   
         HAL_DBGMCU_EnableDBGStopMode(); // Keep debug active in Stop mode for ITM/SWO printf
-       __HAL_RCC_PWR_CLK_ENABLE();
+        __HAL_RCC_PWR_CLK_ENABLE();
         HAL_Delay(100); // Give UART/ITM buffers time to serialize and flush completely before cutting clocks!
-        HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
-          
-        // Il PLL si spegne in Stop 2. ripristino il clock al risveglio!
-        SystemClock_Config(); 
-        HAL_ResumeTick(); // Ripristina il Systick
-        //printf("[DEBUG] CPU woke up from Stop 2 mode!\n");
+        
+        // CORREZIONE CRITICA RACE CONDITION E LOW-POWER:
+        // 1. Verifichiamo se lo stato è cambiato durante la HAL_Delay(100) (es. pressione pulsante)
+        if (current_state == STATE_ACQUISITION) 
+        {
+            // 2. Sospendiamo il SysTick, altrimenti l'interrupt del SysTick ogni 1ms risveglierebbe immediatamente la CPU dallo STOP2!
+            HAL_SuspendTick();
+            
+            HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI);
+            
+            // Il PLL si spegne in Stop 2. Ripristiniamo il clock al risveglio!
+            SystemClock_Config(); 
+            HAL_ResumeTick(); // Ripristiniamo il Systick
+        }
     }  
     
     /* USER CODE END WHILE */
@@ -578,7 +588,10 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				// Do nothing for other states (e.g., if button is pressed during DOWNLOAD).
 				break;
 		}
-	}
+	} else if (GPIO_Pin == 16) {
+    // Debug NAND contents on boot/reset
+    Debug_Read_And_Print_NAND();
+  }
 }
 
 // Falling Edge when User Button is not pressed or Spectrometer triggers
