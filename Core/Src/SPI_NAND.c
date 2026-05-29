@@ -45,8 +45,9 @@ extern read_address_t blocco;
 extern column_address_t colonna;
 extern uint16_t bad_blocks2[1024];
 extern uint16_t total_good_blocks;
-extern uint16_t data_letto[2048];
 extern int exit_flag;
+extern uint16_t nand_offset;
+extern uint16_t data_letto[2048];
 
 // Session-scoped circular boundary tracking pointers
 extern uint16_t session_start_block;
@@ -778,12 +779,21 @@ void write_memory()
 	session_end_block = b;
 	session_end_page = pagina_scritta;
 	session_active = 1;
-
 	pagina_scritta++;
 
-		memset(NAND_packet, 0, sizeof(NAND_packet));
-	}
+	memset(NAND_packet, 0, sizeof(NAND_packet));
+}
 
+void flush_nand_memory(uint16_t offset)
+{
+	if (offset > 0) {
+		// Pad the remaining of the page with 0xFFFF (erased state markers)
+		for (uint16_t p = offset; p < 2048; p++) {
+			NAND_packet[p] = 0xFFFF;
+		}
+		write_memory(); // Writes the page to physical NAND with error recovery
+		nand_offset = 0;
+	}
 }
 
 void read_memory_and_transmit()

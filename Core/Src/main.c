@@ -287,7 +287,6 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0); 
-  HAL_LPTIM_IC_Start(&hlptim1, LPTIM_CHANNEL_1);      // Avvia il timer che sincronizza l'acquisizione
   printf("[BOOT] Initialization completed successfully. Entering main loop...\n");
 
 
@@ -351,20 +350,12 @@ int main(void)
             }
 
             // 5. Elabora i dati acquisiti fino a quel momento (real_samples_numb) e salva in memoria
-            //flush_nand_memory(nand_offset); // forza la scrittura in memoria di quello che c'è nel buffer NAND, anche se non è pieno
             if (real_samples_numb > 0) {
                 Elabora_e_Salva_Campionamento(); 
             }
 
             // FORCE WRITE THE LAST PARTIAL PAGE TO NAND TO PREVENT DATA LOSS
-            if (nand_offset > 0) {
-                // Pad the remaining of the page with 0xFFFF (erased state markers)
-                for (uint16_t p = nand_offset; p < 2048; p++) {
-                    NAND_packet[p] = 0xFFFF;
-                }
-                write_memory(); // Unconditionally writes the page to physical NAND
-                nand_offset = 0;
-            }
+            flush_nand_memory(nand_offset);
 
             button_force_stop = 0; // Reset flag to prevent endless loop execution in STATE_IDLE
           }
