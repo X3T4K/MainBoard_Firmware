@@ -28,6 +28,7 @@
 #include "SPI_NAND.h"
 #include "Memory_operations.h"
 #include "../../USB_Device/App/usb_device.h"
+#include "tim.h"
 
 //extern SPI_HandleTypeDef hspi3;
 extern SPI_HandleTypeDef hspi2;

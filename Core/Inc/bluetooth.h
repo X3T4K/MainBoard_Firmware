@@ -39,6 +39,11 @@ void BLE_ReceiveData(uint8_t* data, uint8_t data_length);
 void BLE_SendPacket(BLE_DataType ble_data_type, uint8_t* data_buffer);
 void BLE_StartReceive(void);
 void BLE_ProcessRxBuffer(void);
+void BLE_FlushRxBuffer(void);
+void BLE_Transmit_NAND_Page(uint32_t absolute_page);
+uint16_t BLE_CalculateCRC16(uint8_t *data, uint16_t length);
+uint32_t BLE_CalculateCRC32(uint8_t *data, uint16_t length);
+void BLE_SendChunk(uint8_t type, uint8_t *payload, uint16_t length);
 
 typedef enum {
     BLE_DISCONNECTED = 0,

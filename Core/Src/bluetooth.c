@@ -28,6 +28,8 @@
 #include "stm32u5xx_hal_cortex.h"
 
 extern UART_HandleTypeDef huart3;
+extern uint16_t bad_blocks[2048];
+extern uint8_t data_letto[4096];
 static uint32_t connection_start_time = 0;
 static bool waiting_for_stream = false;
 
@@ -509,6 +511,9 @@ void BLE_Transmit_NAND_Page(uint32_t absolute_page) {
     column_address_t colonna = 0;
     spi_nand_page_read(row, colonna, data_letto, 4096);
 
+    printf("[BLE] Avvio invio pagina logica %lu (Fisica: Blocco %u, Pagina %u)...\n", 
+           absolute_page, row.block, row.page);
+
     // 3. Controllo "Early EOD" (Pagina non ancora scritta)
     // Una NAND cancellata ha tutti i bit a 1 (0xFF). Controlliamo l'inizio.
     bool is_empty = true;
@@ -533,7 +538,9 @@ void BLE_Transmit_NAND_Page(uint32_t absolute_page) {
         BLE_SendChunk(TYPE_DATA, data_letto + offset, chunk_size);
         offset += chunk_size;
         HAL_Delay(15); // Da rimuovere se implementi Flow Control Hardware (RTS/CTS)
+        printf("[BLE] Inviato chunk da pagina %lu, offset %u/%u\n", absolute_page, offset, 4096);
     }
+    printf("[BLE] Pagina logica %lu inviata, attendo CRC32...\n", absolute_page);
 
     // 5. Invio pacchetto EOP con CRC32
     uint32_t page_crc32 = BLE_CalculateCRC32(data_letto, 4096);
@@ -544,6 +551,7 @@ void BLE_Transmit_NAND_Page(uint32_t absolute_page) {
     eop_payload[3] = page_crc32 & 0xFF;
 
     BLE_SendChunk(TYPE_EOP, eop_payload, 4);
+    printf("[BLE] Pagina logica %lu inviata con successo! CRC32: 0x%08lX\n", absolute_page, (unsigned long)page_crc32);
 }
 
 

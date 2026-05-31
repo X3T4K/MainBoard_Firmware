@@ -45,6 +45,8 @@
 #include "led_driver.h"
 #include "imu_driver.h"
 #include "bluetooth.h"
+#include "Spec_AS7341.h"
+#include "lpbam_i2c_spec.h"
 #include <stdint.h>
 #include <stdio.h>
 
@@ -112,6 +114,7 @@ int exit_flag = 0;
 /// ----- BLE variables ----- ///
 volatile BLE_ConnectionStatus ble_connection_status = BLE_DISCONNECTED; // Inizialmente non connesso
 volatile char ble_connected_mac[14] = {0}; // <--- AGGIUNGI QUESTA RIGA
+volatile uint8_t AS7341InterruptFlag = 0;
 // Timestamp variables //
 Time_Struct timestamp;
 uint16_t tim = 0;
@@ -425,30 +428,9 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == USER_BUTTON_Pin)
 	{
-		// A button press can trigger different state transitions depending on the current state.
-		switch(current_state) {
-			case STATE_IDLE:
-				// If the device is idle, start data acquisition.
-				erase_memory();
-				current_state = STATE_ACQUISITION;
-				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
-				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
-			break;
-			case STATE_ACQUISITION:
-				// If data acquisition is active, stop it.
-				current_state = STATE_IDLE;
-				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
-				LED_Off(LED_GREEN); // Turn off the LED
-				break;
-			case STATE_USB_CONNECTED:
-				// If USB is connected, start the download process.
-				exit_flag = 0;
-				current_state = STATE_DOWNLOAD;
-				break;
-			default:
-				// Do nothing for other states (e.g., if button is pressed during DOWNLOAD).
-				break;
-		}
+    printf("[MAIN] User button pressed. Writing test page...\n");
+		//Debug_Write_Test_Page();
+    Debug_Read_And_Print_NAND();
 	}
 }
 
@@ -458,6 +440,10 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 	if(GPIO_Pin == USER_BUTTON_Pin)
 	{
 
+	}
+	if(GPIO_Pin == SP_INT_Pin)
+	{
+		AS7341InterruptFlag = 1;
 	}
 }
 
