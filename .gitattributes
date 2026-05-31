@@ -19,3 +19,6 @@
 *.elf binary
 *.hex binary
 *.bin binary
+
+# Evita la normalizzazione dei fine riga per i file CMakeLists.txt (previene conflitti con STM32CubeMX su Windows)
+CMakeLists.txt -text
