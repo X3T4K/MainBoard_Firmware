@@ -47,6 +47,8 @@
 #include "imu_driver.h"
 #include "bluetooth.h"
 #include "Mic_IMP34DT05.h"
+#include "Spec_AS7341.h"
+#include "lpbam_i2c_spec.h"
 
 /* USER CODE END Includes */
 
@@ -67,9 +69,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-I2C_HandleTypeDef hi2c3;
-DMA_HandleTypeDef handle_LPDMA1_Channel0;
-LPTIM_HandleTypeDef hlptim1;
+extern I2C_HandleTypeDef hi2c3;
+extern DMA_HandleTypeDef handle_LPDMA1_Channel0;
+extern LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
