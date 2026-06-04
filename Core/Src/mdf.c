@@ -28,7 +28,8 @@ MDF_HandleTypeDef MdfHandle0;
 MDF_FilterConfigTypeDef MdfFilterConfig0;
 MDF_HandleTypeDef MdfHandle1;
 MDF_FilterConfigTypeDef MdfFilterConfig1;
-MDF_ScdConfigTypeDef mdfScdConfig1;
+MDF_OldConfigTypeDef mdfOldConfig1;
+DMA_HandleTypeDef handle_GPDMA1_Channel0;
 
 /* MDF1 init function */
 void MX_MDF1_Init(void)
@@ -126,8 +127,12 @@ void MX_MDF1_Init(void)
   MdfFilterConfig1.AcquisitionMode = MDF_MODE_ASYNC_CONT;
   MdfFilterConfig1.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
   MdfFilterConfig1.DiscardSamples = 0;
-  mdfScdConfig1.Threshold = 20;
-  mdfScdConfig1.BreakSignal = MDF_NO_BREAK_SIGNAL;
+  mdfOldConfig1.OldCicMode = MDF_OLD_FILTER_FASTSINC;
+  mdfOldConfig1.OldDecimationRatio = 32;
+  mdfOldConfig1.HighThreshold = 3355443;
+  mdfOldConfig1.LowThreshold = -3355443;
+  mdfOldConfig1.OldEventConfig = MDF_OLD_SIGNAL_OUTSIDE_THRESHOLDS;
+  mdfOldConfig1.BreakSignal = MDF_NO_BREAK_SIGNAL;
   /* USER CODE BEGIN MDF1_Init 2 */
 
   /* USER CODE END MDF1_Init 2 */
@@ -139,7 +144,7 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
   RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
-  if(IS_MDF_INSTANCE(mdfHandle->Instance))
+  if(mdfHandle->Instance == MDF1_Filter0)
   {
   /* USER CODE BEGIN MDF1_MspInit 0 */
 
@@ -187,6 +192,36 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
 
     __HAL_SYSCFG_FASTMODEPLUS_ENABLE(SYSCFG_FASTMODEPLUS_PB8);
 
+    /* MDF1 DMA Init */
+    /* GPDMA1_REQUEST_MDF1_FLT0 Init */
+    handle_GPDMA1_Channel0.Instance = GPDMA1_Channel0;
+    handle_GPDMA1_Channel0.Init.Request = GPDMA1_REQUEST_MDF1_FLT0;
+    handle_GPDMA1_Channel0.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
+    handle_GPDMA1_Channel0.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    handle_GPDMA1_Channel0.Init.SrcInc = DMA_SINC_FIXED;
+    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_FIXED;
+    handle_GPDMA1_Channel0.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_WORD;
+    handle_GPDMA1_Channel0.Init.DestDataWidth = DMA_DEST_DATAWIDTH_WORD;
+    handle_GPDMA1_Channel0.Init.Priority = DMA_LOW_PRIORITY_LOW_WEIGHT;
+    handle_GPDMA1_Channel0.Init.SrcBurstLength = 1;
+    handle_GPDMA1_Channel0.Init.DestBurstLength = 1;
+    handle_GPDMA1_Channel0.Init.TransferAllocatedPort = DMA_SRC_ALLOCATED_PORT0|DMA_DEST_ALLOCATED_PORT0;
+    handle_GPDMA1_Channel0.Init.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
+    handle_GPDMA1_Channel0.Init.Mode = DMA_NORMAL;
+    if (HAL_DMA_Init(&handle_GPDMA1_Channel0) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(mdfHandle, hdma, handle_GPDMA1_Channel0);
+
+    if (HAL_DMA_ConfigChannelAttributes(&handle_GPDMA1_Channel0, DMA_CHANNEL_NPRIV) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+  }
+
     /* MDF1 interrupt Init */
     HAL_NVIC_SetPriority(MDF1_FLT0_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(MDF1_FLT0_IRQn);
@@ -195,7 +230,6 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
   /* USER CODE BEGIN MDF1_MspInit 1 */
 
   /* USER CODE END MDF1_MspInit 1 */
-  }
 }
 
 void HAL_MDF_MspDeInit(MDF_HandleTypeDef* mdfHandle)
@@ -214,6 +248,9 @@ void HAL_MDF_MspDeInit(MDF_HandleTypeDef* mdfHandle)
     PB8     ------> MDF1_CCK0
     */
     HAL_GPIO_DeInit(GPIOB, GPIO_PIN_1|GPIO_PIN_8);
+
+    /* MDF1 DMA DeInit */
+    HAL_DMA_DeInit(mdfHandle->hdma);
 
     /* MDF1 interrupt Deinit */
     HAL_NVIC_DisableIRQ(MDF1_FLT0_IRQn);

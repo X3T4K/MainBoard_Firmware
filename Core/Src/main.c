@@ -23,6 +23,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "gpdma.h"
 #include "i2c.h"
 #include "icache.h"
 #include "lpdma.h"
@@ -45,6 +46,7 @@
 #include "led_driver.h"
 #include "imu_driver.h"
 #include "bluetooth.h"
+#include "Mic_IMP34DT05.h"
 
 /* USER CODE END Includes */
 
@@ -55,8 +57,6 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
-#define AUDIO_SAMPLES 512  // Numero di campioni per il calcolo
 
 /* USER CODE END PD */
 
@@ -71,10 +71,6 @@ I2C_HandleTypeDef hi2c3;
 DMA_HandleTypeDef handle_LPDMA1_Channel0;
 LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
-
-uint16_t audio_buffer[AUDIO_SAMPLES];    
-float_t rms_value;
-float_t dbfs_value;
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
 uint8_t AS7341_start_register = 0x95; 
@@ -168,6 +164,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_LPDMA1_Init();
+  MX_GPDMA1_Init();
   MX_I2C3_Init();
   MX_LPTIM1_Init();
   MX_ICACHE_Init();
@@ -176,8 +173,8 @@ int main(void)
   MX_SPI3_Init();
   MX_TIM2_Init();
   MX_USART3_UART_Init();
-  MX_USB_OTG_FS_PCD_Init();
   MX_TIM1_Init();
+  MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
 
   // Turn the RED LED on to indicate the start of the initialization process
@@ -229,8 +226,8 @@ int main(void)
 
   /* USER CODE BEGIN MDF Start */
   // Avvia l'SCD (Short Circuit Detector) sul filtro 1 in modalità interrupt
-  mdfScdConfig1.Threshold = 5;
-  if (HAL_MDF_ScdStart_IT(&MdfHandle1, &mdfScdConfig1) != HAL_OK)
+  mdfScdConfig1.Threshold = MDF_Old_THRESHOLD_100DB; // Imposta la soglia a 100 dB
+  if (HAL_MDF_OldStart_IT(&MdfHandle1, &mdfScdConfig1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -440,33 +437,10 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 }
 
 
-// funzione calcolo decibel da energia segnale buffer
-void Calculate_dB(uint16_t *buffer, uint16_t size) {
-    long long sum_sq = 0;
-    
-    // 1. Calcolo della somma dei quadrati (Energia)
-    for(int i=0; i<size; i++) {
-        // Centriamo il segnale (da 0-65535 a circa -32768/+32767)
-        int32_t sample = (int32_t)buffer[i] - 32768; 
-        sum_sq += (sample * sample);
-    }
-    
-    // 2. Calcolo del valore RMS
-    float rms = sqrtf((float)sum_sq / size);
-    
-    // 3. Conversione in dBFS
-    // 32768.0f è il valore massimo per un segnale a 16 bit
-    if (rms > 0) {
-        dbfs_value = 20.0f * log10f(rms / 32768.0f);
-    } else {
-        dbfs_value = -100.0f; // Silenzio assoluto
-    }
-}
-
 // Callback per il rilevamento di eventi di stress acustico (SCD)
-void HAL_MDF_ErrorCallback(MDF_HandleTypeDef *hmdf)
+void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
 {
-    if ((hmdf->Instance == MDF1_Filter1) && (hmdf->ErrorCode & MDF_ERROR_SHORT_CIRCUIT))
+    if (hmdf->Instance == MDF1_Filter1)
     {
         // 1. Accendi il LED di allerta
         HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
@@ -476,7 +450,7 @@ void HAL_MDF_ErrorCallback(MDF_HandleTypeDef *hmdf)
         mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
         mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
         mdfDmaConfig0.MsbOnly    = DISABLE;
-        if (HAL_MDF_AcqStart_DMA(&MdfHandle1, &mdfDmaConfig0) != HAL_OK)
+        if (HAL_MDF_AcqStart_DMA(&MdfHandle1, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
         {
             Error_Handler();
         }
@@ -490,7 +464,7 @@ void HAL_MDF_AcqCompleteCallback(MDF_HandleTypeDef *hmdf)
     Calculate_dB(audio_buffer, AUDIO_SAMPLES);
     
     // Se i dB confermano lo stress (es. sopra i -10 dBFS)
-    if(dbfs_value > -10.0f) {
+    if(dbspl_value > 60.0f) {
         // Conferma allarme o invia dati via Bluetooth
     }
 }
