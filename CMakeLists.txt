@@ -50,6 +50,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/Memory_operations.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/SPI_NAND.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/Spec_AS7341.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/Mic_IMP34DT05.c
     ${CMAKE_CURRENT_SOURCE_DIR}/USB_Device/App/usbd_cdc_if.c
     ${CMAKE_CURRENT_SOURCE_DIR}/USB_Device/App/usbd_desc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/USB_Device/App/usb_device.c

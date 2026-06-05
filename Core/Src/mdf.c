@@ -133,6 +133,7 @@ void MX_MDF1_Init(void)
   mdfOldConfig1.LowThreshold = -3355443;
   mdfOldConfig1.OldEventConfig = MDF_OLD_SIGNAL_OUTSIDE_THRESHOLDS;
   mdfOldConfig1.BreakSignal = MDF_NO_BREAK_SIGNAL;
+
   /* USER CODE BEGIN MDF1_Init 2 */
 
   /* USER CODE END MDF1_Init 2 */

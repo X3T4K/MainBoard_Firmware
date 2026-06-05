@@ -5,12 +5,45 @@
 
 #include "Mic_IMP34DT05.h"
 #include <math.h>
+#include "mdf.h"
+#include "tim.h"
 
 /* Variabili globali per gestione audio */
-uint32_t audio_buffer[AUDIO_SAMPLES];
+int32_t audio_buffer[AUDIO_SAMPLES];
 float_t rms_value;
 float_t dbfs_value;
 float_t dbspl_value;
+
+/**
+ * @brief Start microphone acquisition trigger and threshold detection
+ */
+void Mic_Start(void)
+{
+    // Avvia il timer TIM1 che genera il clock per il microfono PDM (CCK0)
+    if (HAL_TIM_Base_Start(&htim1) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    
+    // Avvia il monitoraggio della soglia (Over-Limit Detector) sul Filtro 1 in modalità interrupt
+    if (HAL_MDF_OldStart_IT(&MdfHandle1, &mdfOldConfig1) != HAL_OK)
+    {
+        Error_Handler();
+    }
+}
+
+/**
+ * @brief Stop microphone acquisition trigger and threshold detection
+ */
+void Mic_Stop(void)
+{
+    // Ferma il monitoraggio della soglia
+    HAL_MDF_OldStop_IT(&MdfHandle1);
+    
+    // Ferma il timer TIM1
+    HAL_TIM_Base_Stop(&htim1);
+}
+
 
 /**
  * @brief Calculate dB from audio buffer energy

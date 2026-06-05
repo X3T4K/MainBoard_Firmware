@@ -224,15 +224,12 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
   HAL_DBGMCU_DisableDBGStopMode();
   __HAL_RCC_PWR_CLK_ENABLE();
-  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); //wake up only when there is an interupt
-
   /* USER CODE BEGIN MDF Start */
-  // Avvia l'SCD (Short Circuit Detector) sul filtro 1 in modalità interrupt
-  mdfScdConfig1.Threshold = MDF_Old_THRESHOLD_100DB; // Imposta la soglia a 100 dB
-  if (HAL_MDF_OldStart_IT(&MdfHandle1, &mdfScdConfig1) != HAL_OK)
-  {
-    Error_Handler();
-  }
+  // Avvia il monitoraggio acustico (Timer1 per il clock e MDF1 Filter 1 per la soglia)
+  Mic_Start();
+  /* USER CODE END MDF Start */
+
+  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); // wake up only when there is an interrupt
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -452,7 +449,7 @@ void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
         mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
         mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
         mdfDmaConfig0.MsbOnly    = DISABLE;
-        if (HAL_MDF_AcqStart_DMA(&MdfHandle1, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
+        if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
         {
             Error_Handler();
         }
@@ -463,11 +460,14 @@ void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
 // Quando il buffer è pieno, calcoliamo i dB
 void HAL_MDF_AcqCompleteCallback(MDF_HandleTypeDef *hmdf)
 {
-    Calculate_dB(audio_buffer, AUDIO_SAMPLES);
-    
-    // Se i dB confermano lo stress (es. sopra i -10 dBFS)
-    if(dbspl_value > 60.0f) {
-        // Conferma allarme o invia dati via Bluetooth
+    if (hmdf->Instance == MDF1_Filter0)
+    {
+        Calculate_dB(audio_buffer, AUDIO_SAMPLES);
+        
+        // Se i dB confermano lo stress (es. sopra i -10 dBFS)
+        if(dbspl_value > 60.0f) {
+            // Conferma allarme o invia dati via Bluetooth
+        }
     }
 }
 

@@ -1,6 +1,8 @@
 build
 mx.scratch
 !.settings
+/.agents
+/graphify-out
 
 # Ambienti virtuali Python
 venv/
