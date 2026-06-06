@@ -52,7 +52,7 @@ void MX_MDF1_Init(void)
   MdfHandle0.Init.CommonParam.OutputClock.Activation = ENABLE;
   MdfHandle0.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
   MdfHandle0.Init.CommonParam.OutputClock.Divider = 5;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
+  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
   MdfHandle0.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
   MdfHandle0.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
   MdfHandle0.Init.SerialInterface.Activation = ENABLE;
@@ -84,7 +84,7 @@ void MX_MDF1_Init(void)
   MdfFilterConfig0.Integrator.Value = 2;
   MdfFilterConfig0.Integrator.OutputDivision = MDF_INTEGRATOR_OUTPUT_DIV_128;
   MdfFilterConfig0.SoundActivity.Activation = DISABLE;
-  MdfFilterConfig0.AcquisitionMode = MDF_MODE_SYNC_CONT;
+  MdfFilterConfig0.AcquisitionMode = MDF_MODE_ASYNC_CONT;
   MdfFilterConfig0.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
   MdfFilterConfig0.DiscardSamples = 255;
   MdfFilterConfig0.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
@@ -99,7 +99,7 @@ void MX_MDF1_Init(void)
   MdfHandle1.Init.CommonParam.OutputClock.Activation = ENABLE;
   MdfHandle1.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
   MdfHandle1.Init.CommonParam.OutputClock.Divider = 5;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
   MdfHandle1.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
   MdfHandle1.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
   MdfHandle1.Init.SerialInterface.Activation = DISABLE;
@@ -129,8 +129,8 @@ void MX_MDF1_Init(void)
   MdfFilterConfig1.DiscardSamples = 0;
   mdfOldConfig1.OldCicMode = MDF_OLD_FILTER_FASTSINC;
   mdfOldConfig1.OldDecimationRatio = 32;
-  mdfOldConfig1.HighThreshold = 3355443;
-  mdfOldConfig1.LowThreshold = -3355443;
+  mdfOldConfig1.HighThreshold = 1; // Forza attivazione immediata per avviare il monitoraggio continuo
+  mdfOldConfig1.LowThreshold = -1;
   mdfOldConfig1.OldEventConfig = MDF_OLD_SIGNAL_OUTSIDE_THRESHOLDS;
   mdfOldConfig1.BreakSignal = MDF_NO_BREAK_SIGNAL;
 
@@ -163,7 +163,7 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     PeriphClkInit.PLL3.PLL3R = 2;
     PeriphClkInit.PLL3.PLL3RGE = RCC_PLLVCIRANGE_1;
     PeriphClkInit.PLL3.PLL3FRACN = 0;
-    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVP;
+    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVQ;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
     {
       Error_Handler();

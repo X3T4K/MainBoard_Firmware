@@ -188,7 +188,7 @@ int main(void)
   MX_TIM1_Init();
   MX_USB_OTG_FS_PCD_Init();
   /* USER CODE BEGIN 2 */
-
+  printf("\r\n--- MainBoard IMU Logger ---\r\n");
   // Turn the RED LED on to indicate the start of the initialization process
   LED_On(LED_RED);
 
@@ -235,11 +235,34 @@ int main(void)
   HAL_DBGMCU_DisableDBGStopMode();
   __HAL_RCC_PWR_CLK_ENABLE();
   /* USER CODE BEGIN MDF Start */
+  HAL_DBGMCU_EnableDBGStopMode(); // Permette al debug di funzionare anche in modalità STOP
   // Avvia il monitoraggio acustico (Timer1 per il clock e MDF1 Filter 1 per la soglia)
+  printf("\r\n--- Test Microfono Digital IMP34DT05 ---\r\n");
+  printf("System: Avvio monitoraggio soglia acustica...\r\n");
+  HAL_Delay(50);
   Mic_Start();
+  HAL_Delay(100);
+  printf("MDF1 Base: GCR=0x%08X, CKGCR=0x%08X\r\n", (unsigned int)MDF1->GCR, (unsigned int)MDF1->CKGCR);
+  printf("RCC Regs: CR=0x%08X, PLL3CFGR=0x%08X, PLL3DIVR=0x%08X, CCIPR2=0x%08X\r\n",
+         (unsigned int)RCC->CR, (unsigned int)RCC->PLL3CFGR, (unsigned int)RCC->PLL3DIVR, (unsigned int)RCC->CCIPR2);
+  printf("MDF1_FLT1: DFLTCR=0x%08X, DFLTCICR=0x%08X, DFLTIER=0x%08X, DFLTISR=0x%08X\r\n", 
+         (unsigned int)MdfHandle1.Instance->DFLTCR, (unsigned int)MdfHandle1.Instance->DFLTCICR, 
+         (unsigned int)MdfHandle1.Instance->DFLTIER, (unsigned int)MdfHandle1.Instance->DFLTISR);
+  printf("MDF1_FLT1 OLD: OLDCR=0x%08X, OLDTHLR=0x%08X, OLDTHHR=0x%08X, DFLTDR=0x%08X\r\n", 
+         (unsigned int)MdfHandle1.Instance->OLDCR, (unsigned int)MdfHandle1.Instance->OLDTHLR, 
+         (unsigned int)MdfHandle1.Instance->OLDTHHR, (unsigned int)MdfHandle1.Instance->DFLTDR);
+  HAL_Delay(100);
+  printf("System: Ingresso in SLEEP.\r\n");
+  HAL_Delay(50);
   /* USER CODE END MDF Start */
 
-  HAL_PWREx_EnterSTOP2Mode(PWR_STOPENTRY_WFI); // wake up only when there is an interrupt
+  HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI); // wake up only when there is an interrupt
+
+  printf("System: Risvegliato da SLEEP!\r\n");
+  HAL_Delay(50);
+  printf("MDF1_FLT1 Post-SLEEP: DFLTISR=0x%08X, DFLTDR=0x%08X\r\n", 
+         (unsigned int)MdfHandle1.Instance->DFLTISR, (unsigned int)MdfHandle1.Instance->DFLTDR);
+  HAL_Delay(50);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -409,30 +432,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == USER_BUTTON_Pin)
 	{
-		// A button press can trigger different state transitions depending on the current state.
-		switch(current_state) {
-			case STATE_IDLE:
-				// If the device is idle, start data acquisition.
-				erase_memory();
-				current_state = STATE_ACQUISITION;
-				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
-				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
-			break;
-			case STATE_ACQUISITION:
-				// If data acquisition is active, stop it.
-				current_state = STATE_IDLE;
-				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
-				LED_Off(LED_GREEN); // Turn off the LED
-				break;
-			case STATE_USB_CONNECTED:
-				// If USB is connected, start the download process.
-				exit_flag = 0;
-				current_state = STATE_DOWNLOAD;
-				break;
-			default:
-				// Do nothing for other states (e.g., if button is pressed during DOWNLOAD).
-				break;
-		}
+		
 	}
 }
 
@@ -444,17 +444,72 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 
 	}
 }
-
+int32_t global_max_peak = 0;
 
 // Callback per il rilevamento di eventi di stress acustico (SCD)
 void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
 {
+    //printf("MDF Callback: Soglia acustica superata! TresholdInfo: 0x%08lX\r\n", TresholdInfo);
     if (hmdf->Instance == MDF1_Filter1)
     {
-        // 1. Accendi il LED di allerta
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+        // Se c'è già una cattura in corso su Filtro 0, non facciamo nulla
+        if (MdfHandle0.State == HAL_MDF_STATE_READY)
+        {
+            // 1. Accendi il LED di allerta
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+            
+            printf("MDF Callback: Superata soglia acustica! Avvio cattura DMA...\r\n");
+            
+            // 2. Fai partire una cattura rapida di campioni col Filtro 0  
+            MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
+            mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
+            mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
+            mdfDmaConfig0.MsbOnly    = DISABLE;
+            if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
+            {
+                Error_Handler();
+            }
+        }
+    }
+}
+
+// Quando il buffer è pieno, calcoliamo i dB
+void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
+{
+    if (hmdf->Instance == MDF1_Filter0)
+    {
+        // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
+        HAL_MDF_AcqStop(&MdfHandle0);
+
+        // Spegni il LED di allerta
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+
+        // Calcola il valore di picco assoluto nel buffer corrente (valori a 24-bit allineati)
+        int32_t current_peak = 0;
+        for (int i = 0; i < AUDIO_SAMPLES; i++)
+        {
+            int32_t val = audio_buffer[i] >> 8;
+            if (val < 0) val = -val;
+            if (val > current_peak) current_peak = val;
+        }
+
+        // Se il picco corrente supera il massimo registrato, lo stampiamo
+        if (current_peak > global_max_peak)
+        {
+            global_max_peak = current_peak;
+            printf(">>> NUOVO PICCO RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
+        }
+
+        // Calcola anche i dB per riferimento
+        Calculate_dB(audio_buffer, AUDIO_SAMPLES);
         
-        // 2. Fai partire una cattura rapida di campioni col Filtro 0  
+        // Stampa il valore con segno ed i decimali calcolati in modo sicuro
+        /*printf("dBFS: %d.%02d | dBSPL: %d.%02d (Picco corrente: %ld)\r\n", 
+               (int)dbfs_value, (int)(fabsf(dbfs_value) * 100.0f) % 100, 
+               (int)dbspl_value, (int)(fabsf(dbspl_value) * 100.0f) % 100,
+               (long)current_peak);*/
+        
+        // Riavvia subito il monitoraggio continuo (Filtro 0 DMA)
         MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
         mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
         mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
@@ -462,21 +517,6 @@ void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
         if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
         {
             Error_Handler();
-        }
-      
-    }
-}
-
-// Quando il buffer è pieno, calcoliamo i dB
-void HAL_MDF_AcqCompleteCallback(MDF_HandleTypeDef *hmdf)
-{
-    if (hmdf->Instance == MDF1_Filter0)
-    {
-        Calculate_dB(audio_buffer, AUDIO_SAMPLES);
-        
-        // Se i dB confermano lo stress (es. sopra i -10 dBFS)
-        if(dbspl_value > 60.0f) {
-            // Conferma allarme o invia dati via Bluetooth
         }
     }
 }
@@ -521,8 +561,8 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 {
   /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  //User can add his own implementation to report the file name and line number,
+  printf("Wrong parameters value: file %s on line %d\r\n", file, line);
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

@@ -7,6 +7,7 @@
 #include <math.h>
 #include "mdf.h"
 #include "tim.h"
+#include <stdio.h>
 
 /* Variabili globali per gestione audio */
 int32_t audio_buffer[AUDIO_SAMPLES];
@@ -22,13 +23,36 @@ void Mic_Start(void)
     // Avvia il timer TIM1 che genera il clock per il microfono PDM (CCK0)
     if (HAL_TIM_Base_Start(&htim1) != HAL_OK)
     {
+        printf("ERROR: TIM1 start failed!\r\n");
         Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: TIM1 started successfully.\r\n");
+    }
+    
+    // Configura e avvia il Canale Filtro 1 in modalità polling (necessario per abilitare DFLTEN e applicare MdfFilterConfig1)
+    HAL_StatusTypeDef status = HAL_MDF_AcqStart(&MdfHandle1, &MdfFilterConfig1);
+    if (status != HAL_OK)
+    {
+        printf("ERROR: MDF AcqStart (Filter 1) failed! Status: %d\r\n", status);
+        Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: MDF AcqStart (Filter 1) active.\r\n");
     }
     
     // Avvia il monitoraggio della soglia (Over-Limit Detector) sul Filtro 1 in modalità interrupt
-    if (HAL_MDF_OldStart_IT(&MdfHandle1, &mdfOldConfig1) != HAL_OK)
+    status = HAL_MDF_OldStart_IT(&MdfHandle1, &mdfOldConfig1);
+    if (status != HAL_OK)
     {
+        printf("ERROR: MDF OldStart_IT failed! Status: %d\r\n", status);
         Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: MDF OldStart_IT started successfully.\r\n");
     }
 }
 
@@ -39,6 +63,9 @@ void Mic_Stop(void)
 {
     // Ferma il monitoraggio della soglia
     HAL_MDF_OldStop_IT(&MdfHandle1);
+    
+    // Ferma l'acquisizione sul Canale Filtro 1
+    HAL_MDF_AcqStop(&MdfHandle1);
     
     // Ferma il timer TIM1
     HAL_TIM_Base_Stop(&htim1);

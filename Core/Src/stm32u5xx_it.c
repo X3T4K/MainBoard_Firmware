@@ -22,6 +22,7 @@
 #include "stm32u5xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -425,7 +426,7 @@ void SPI3_IRQHandler(void)
 void MDF1_FLT0_IRQHandler(void)
 {
   /* USER CODE BEGIN MDF1_FLT0_IRQn 0 */
-
+  printf("ISR: MDF1 Filter 0 ISR entered!\r\n");
   /* USER CODE END MDF1_FLT0_IRQn 0 */
   HAL_MDF_IRQHandler(&MdfHandle0);
   /* USER CODE BEGIN MDF1_FLT0_IRQn 1 */
@@ -439,7 +440,7 @@ void MDF1_FLT0_IRQHandler(void)
 void MDF1_FLT1_IRQHandler(void)
 {
   /* USER CODE BEGIN MDF1_FLT1_IRQn 0 */
-
+  //printf("ISR: MDF1 Filter 1 ISR entered!\r\n");
   /* USER CODE END MDF1_FLT1_IRQn 0 */
   HAL_MDF_IRQHandler(&MdfHandle1);
   /* USER CODE BEGIN MDF1_FLT1_IRQn 1 */
