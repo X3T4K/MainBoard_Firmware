@@ -39,7 +39,7 @@ void SPEC_Init(void) {
     // [ATTENZIONE - Leggi la nota in fondo su questo registro]
     SPEC_WriteRegister(SPEC_REG_IEN, 0x08);
 
-    SPEC_WriteRegister(SPEC_REG_CFG8, 0x02); 
+    SPEC_WriteRegister(SPEC_REG_CFG8, 0xC6); 
     SPEC_WriteRegister(SPEC_REG_CFG12, 0x01); 
     SPEC_WriteRegister(SPEC_REG_CFG0, 0x20); 
     SPEC_WriteRegister(SPEC_REG_WTIME, 0xFF); 

@@ -24,6 +24,7 @@
 #define SPEC_REG_STATUS3   0xA4
 
 
+
 // ... aggiungerai gli altri man mano che ti servono
 
 /* --- Prototipi delle funzioni --- */
