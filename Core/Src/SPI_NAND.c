@@ -806,7 +806,7 @@ void read_memory_and_transmit()
 			blocco.page = pag;
 			colonna = 0;
 			// Save data of the page into data_letto
-			spi_nand_page_read(blocco, colonna, data_letto, sizeof(data_letto));
+			spi_nand_page_read(blocco, colonna, (uint8_t*)data_letto, sizeof(data_letto));
 
 			if(data_letto[0] == 65535){ // If the first element is 65535 (0xFFFF) it means that the page is empty, so we can stop reading
 				// in this case exit condition is if the first element is 255 but can be adapted
@@ -820,7 +820,7 @@ void read_memory_and_transmit()
 				break; // exit cycle
 			}
 
-			CDC_Transmit_FS(data_letto, sizeof(data_letto)); // Send data via USB
+			CDC_Transmit_FS((uint8_t*)data_letto, sizeof(data_letto)); // Send data via USB
 			HAL_Delay(10); // wait some time
 		}
 		}
