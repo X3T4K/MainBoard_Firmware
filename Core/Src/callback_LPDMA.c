@@ -69,9 +69,9 @@ void Elabora_e_Salva_Campionamento(void)
 
         // --- 4. NORMALIZZAZIONE CON COEFFICIENTI E GAIN REALE ---
         // Utilizziamo variabili temporanee a 64 bit per evitare qualsiasi overflow durante la moltiplicazione per 40000
-        uint64_t temp_deep_blue = ((uint64_t)ch0_raw * 40000) / actual_gain;
-        uint64_t temp_blue      = ((uint64_t)ch1_raw * 40000) / actual_gain;
-        uint64_t temp_clear     = ((uint64_t)ch4_raw * 40000) / actual_gain;
+        uint64_t temp_deep_blue = ((uint64_t)ch0_raw * 1000) / actual_gain;
+        uint64_t temp_blue      = ((uint64_t)ch1_raw * 1000) / actual_gain;
+        uint64_t temp_clear     = ((uint64_t)ch4_raw * 1000) / actual_gain;
 
         // Saturazione di sicurezza prima del cast a 16 bit per non corrompere il dato registrato
         pacchetto.deep_blue = (temp_deep_blue > 0xFFFF) ? 0xFFFF : (uint16_t)temp_deep_blue;
