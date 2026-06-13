@@ -78,7 +78,6 @@ static void MX_Blue_Flick_Acq_Q_UnLink(DMA_HandleTypeDef *hdma);
 
 /* LPBAM DMA user callback APIs */
 static void MX_Blue_Flick_Acq_Q_DMA_TC_Callback(DMA_HandleTypeDef *hdma);
-static void MX_Blue_Flick_Acq_Q_DMA_Error_Callback(DMA_HandleTypeDef *hdma);
 /* LPBAM DMA NVIC API */
 static void MX_DMA_NVIC_Config(DMA_HandleTypeDef *hdma, uint32_t PreemptPriority, uint32_t SubPriority);
 
@@ -672,14 +671,10 @@ static void MX_Blue_Flick_Acq_Q_Link(DMA_HandleTypeDef *hdma)
   {
     Error_Handler();
   }
-  __HAL_DMA_ENABLE_IT(hdma, DMA_IT_TC | DMA_IT_DTE | DMA_IT_ULE | DMA_IT_USE);
+  __HAL_DMA_ENABLE_IT(hdma, DMA_IT_TC);
 
   /* Register DMA channel error callbacks */
   if (HAL_DMA_RegisterCallback(hdma, HAL_DMA_XFER_CPLT_CB_ID, MX_Blue_Flick_Acq_Q_DMA_TC_Callback) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_DMA_RegisterCallback(hdma, HAL_DMA_XFER_ERROR_CB_ID, MX_Blue_Flick_Acq_Q_DMA_Error_Callback) != HAL_OK)
   {
     Error_Handler();
   }
@@ -708,21 +703,6 @@ static void MX_Blue_Flick_Acq_Q_UnLink(DMA_HandleTypeDef *hdma)
   if (HAL_DMAEx_List_DeInit(hdma) != HAL_OK)
   {
     Error_Handler();
-  }
-}
-
-static void MX_Blue_Flick_Acq_Q_DMA_Error_Callback(DMA_HandleTypeDef *hdma)
-{
-  printf("[DEBUG] DMA Transfer Error Callback Fired! ErrorCode = 0x%lx\n", hdma->ErrorCode);
-  if (hdma->Instance != NULL) {
-    DMA_Channel_TypeDef *ch = (DMA_Channel_TypeDef *)hdma->Instance;
-    printf("[DEBUG] LPDMA Regs - CSR: 0x%lx, CCR: 0x%lx, CLBAR: 0x%lx, CLLR: 0x%lx, CBR1: 0x%lx, CSAR: 0x%lx, CDAR: 0x%lx\n",
-           ch->CSR, ch->CCR, ch->CLBAR, ch->CLLR, ch->CBR1, ch->CSAR, ch->CDAR);
-  }
-  extern I2C_HandleTypeDef hi2c3;
-  if (hi2c3.Instance != NULL) {
-    printf("[DEBUG] I2C3 Regs - ISR: 0x%lx, CR1: 0x%lx, CR2: 0x%lx\n",
-           hi2c3.Instance->ISR, hi2c3.Instance->CR1, hi2c3.Instance->CR2);
   }
 }
 

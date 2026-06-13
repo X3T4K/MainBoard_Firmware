@@ -73,6 +73,9 @@
 
 /* Private variables ---------------------------------------------------------*/
 
+I2C_HandleTypeDef hi2c3;
+DMA_HandleTypeDef handle_LPDMA1_Channel0;
+LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 /// @brief 
@@ -204,12 +207,12 @@ int main(void)
   MX_LPTIM1_Init();
   MX_ICACHE_Init();
   MX_MDF1_Init();
-  MX_RTC_Init();
   MX_SPI2_Init();
   MX_SPI3_Init();
   MX_TIM2_Init();
   MX_USART3_UART_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
 
   // Cold start initialization for SRAM4 retention variables (NOLOAD)
@@ -450,12 +453,10 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;
-  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMBOOST = RCC_PLLMBOOST_DIV2;
@@ -470,8 +471,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-
-  
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
@@ -488,6 +487,10 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+
+  /** Enable the force of HSI in stop mode
+  */
+  __HAL_RCC_HSISTOP_ENABLE();
 }
 
 /* USER CODE BEGIN 4 */

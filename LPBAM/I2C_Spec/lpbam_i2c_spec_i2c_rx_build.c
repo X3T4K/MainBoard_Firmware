@@ -29,102 +29,102 @@
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_CH_REG1_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_CH_REG1_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG1_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG1_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_1_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_1_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_1_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_1_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_Flick_REG1_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_Flick_REG1_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG1_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG1_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_8_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_8_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_8_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_8_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_CH_REG2_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_CH_REG2_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG2_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG2_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_2_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_2_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_2_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_2_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_Flick_REG2_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_Flick_REG2_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG2_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG2_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_3_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_3_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_3_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_3_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_CH_REG3_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_CH_REG3_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG3_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG3_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_4_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_4_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_4_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_4_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_Flick_REG3_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_Flick_REG3_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG3_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG3_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_5_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_5_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_5_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_5_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_CH_REG4_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_CH_REG4_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG4_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG4_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_6_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_6_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_6_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_6_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_Flick_REG4_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_Flick_REG4_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG4_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG4_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_7_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_7_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_7_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_7_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_CH_REG5_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_CH_REG5_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG5_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_CH_REG5_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Receive_Data_17_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Receive_Data_17_Desc[1] */
-static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_17_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxDataDesc_t Blue_Flick_Acq_Q_Master_Receive_Data_17_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Master_Transmit_Flick_REG5_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Master_Transmit_Flick_REG5_Desc[1] */
-static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG5_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterTxDataDesc_t Blue_Flick_Acq_Q_Master_Transmit_Flick_REG5_Desc[1];
 
 /* USER CODE BEGIN Blue_Flick_Acq_Q_Final_Receive_Desc[1] */
 
 /* USER CODE END Blue_Flick_Acq_Q_Final_Receive_Desc[1] */
-static LPBAM_I2C_MasterRxFullDesc_t Blue_Flick_Acq_Q_Final_Receive_Desc[1] __attribute__((section(".sram4_retention")));
+static LPBAM_I2C_MasterRxFullDesc_t Blue_Flick_Acq_Q_Final_Receive_Desc[1];
 
 /* USER CODE BEGIN I2C_Spec_I2C_RX_Descs 1 */
 
@@ -132,7 +132,7 @@ static LPBAM_I2C_MasterRxFullDesc_t Blue_Flick_Acq_Q_Final_Receive_Desc[1] __att
 
 /* Exported variables ------------------------------------------------------------------------------------------------*/
 /* LPBAM queues declaration */
-DMA_QListTypeDef Blue_Flick_Acq_Q __attribute__((section(".sram4_retention")));
+DMA_QListTypeDef Blue_Flick_Acq_Q;
 
 /* External variables ------------------------------------------------------------------------------------------------*/
 /* USER CODE BEGIN EV */
@@ -200,8 +200,7 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
    pTxData_I2C.AddressingMode = LPBAM_I2C_ADDRESSINGMODE_7BIT;
    pTxData_I2C.SequenceNumber = 1;
    pTxData_I2C.pData = (uint8_t*)&AS7341_start_register[0];
-   //0x39 shiftato a sinistra di 1 bit per il formato 7-bit (0x72) e con bit R/W=0 per la scrittura
-   pTxData_I2C.DevAddress = 0x72;
+   pTxData_I2C.DevAddress = 0x39;
    pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
@@ -245,7 +244,7 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
    pRxData_I2C.AddressingMode = LPBAM_I2C_ADDRESSINGMODE_7BIT;
    pRxData_I2C.SequenceNumber = 1;
    pRxData_I2C.pData = (uint8_t*)&AS7341_Rx_Buffer[0];
-   pRxData_I2C.DevAddress = 0x72;
+   pRxData_I2C.DevAddress = 0x39;
    pRxData_I2C.Size = 12;
   /* Set transfer parameters */
   data_size = pRxData_I2C.Size;
@@ -283,7 +282,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_Flick_REG1 build
     */
    pTxData_I2C.pData = (uint8_t*)&Flicker_REG[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -320,7 +318,7 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Receive_Data_8 build
     */
    pRxData_I2C.pData = (uint8_t*)&Flicker_buffer[0];
-   pRxData_I2C.DevAddress = 0x72;
+   pRxData_I2C.DevAddress = 1;
    pRxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pRxData_I2C.Size;
@@ -358,7 +356,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_CH_REG2 build
     */
    pTxData_I2C.pData = (uint8_t*)&AS7341_start_register[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -395,7 +392,7 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Receive_Data_2 build
     */
    pRxData_I2C.pData = (uint8_t*)&AS7341_Rx_Buffer[12];
-   pRxData_I2C.DevAddress = 0x72;
+   pRxData_I2C.DevAddress = 0x39;
    pRxData_I2C.Size = 12;
   /* Set transfer parameters */
   data_size = pRxData_I2C.Size;
@@ -433,7 +430,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_Flick_REG2 build
     */
    pTxData_I2C.pData = (uint8_t*)&Flicker_REG[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -507,7 +503,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_CH_REG3 build
     */
    pTxData_I2C.pData = (uint8_t*)&AS7341_start_register[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -581,7 +576,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_Flick_REG3 build
     */
    pTxData_I2C.pData = (uint8_t*)&Flicker_REG[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -655,7 +649,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_CH_REG4 build
     */
    pTxData_I2C.pData = (uint8_t*)&AS7341_start_register[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -729,7 +722,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_Flick_REG4 build
     */
    pTxData_I2C.pData = (uint8_t*)&Flicker_REG[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -803,7 +795,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_CH_REG5 build
     */
    pTxData_I2C.pData = (uint8_t*)&AS7341_start_register[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -877,7 +868,6 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
     * Blue_Flick_Acq queue Master_Transmit_Flick_REG5 build
     */
    pTxData_I2C.pData = (uint8_t*)&Flicker_REG[0];
-   pTxData_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pTxData_I2C.Size;
   tmp_data_size = pTxData_I2C.Size;
@@ -919,7 +909,7 @@ static void MX_Blue_Flick_Acq_Q_Build(void)
    pRxFull_I2C.AddressingMode = LPBAM_I2C_ADDRESSINGMODE_7BIT;
    pRxFull_I2C.SequenceNumber = 1;
    pRxFull_I2C.pData = (uint8_t*)&Flicker_buffer[4];
-   pRxFull_I2C.DevAddress = 0x72;
+   pRxFull_I2C.DevAddress = 0x39;
    pRxFull_I2C.Size = 1;
   /* Set transfer parameters */
   data_size = pRxFull_I2C.Size;

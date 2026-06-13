@@ -19,13 +19,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "rtc.h"
-#include "main.h"
 
 /* USER CODE BEGIN 0 */
 RTC_HandleTypeDef hrtc;
 /* USER CODE END 0 */
 
-
+RTC_HandleTypeDef hrtc;
 
 /* RTC init function */
 void MX_RTC_Init(void)
