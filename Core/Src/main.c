@@ -317,6 +317,8 @@ int main(void)
             
             // Il PLL si spegne in Stop 2. Ripristiniamo il clock al risveglio!
             SystemClock_Config(); 
+            /* Enable HSI in Stop mode (HSIKERON) so LPBAM can autonomously request it during Stop 2 sleep! */
+            __HAL_RCC_HSISTOP_ENABLE();
             HAL_ResumeTick(); // Ripristiniamo il Systick
         }
     }  
@@ -469,8 +471,7 @@ void SystemClock_Config(void)
     Error_Handler();
   }
 
-  /* Enable HSI in Stop mode (HSIKERON) so LPBAM can autonomously request it during Stop 2 sleep! */
-  __HAL_RCC_HSISTOP_ENABLE();
+  
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
