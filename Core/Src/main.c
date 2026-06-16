@@ -69,9 +69,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-extern I2C_HandleTypeDef hi2c3;
-extern DMA_HandleTypeDef handle_LPDMA1_Channel0;
-extern LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
@@ -105,8 +102,10 @@ uint8_t NAND_packet[4096] = {0};
 uint16_t sample = 0;
 uint16_t blocco_scritto = 0;
 uint8_t pagina_scritta=0;
-uint16_t b = 0;
+uint16_t b = 1024; // start writing continuous audio data from middle of NAND
 
+read_address_t blocco_peak;
+read_address_t blocco_acq;
 read_address_t blocco;
 column_address_t colonna = 0;
 
@@ -439,9 +438,9 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				// If the previous session wrote some data, circularly advance to the next good block
 				if (pagina_scritta > 0) {
 					b++;
-					if (b >= total_good_blocks || bad_blocks[b] == 0xFFFF) {
-						b = 0;
-					}
+          if (b >= total_good_blocks || bad_blocks[b] == 0xFFFF) {
+            b = 1024; // wrap within upper half of memory
+          }
 					pagina_scritta = 0;
 				}
 				// Set up session boundary pointers
@@ -558,6 +557,7 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
 
           // Calcola anche i dB per riferimento
           current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
+
         } else if (acquisition_active) {
 
           printf("MDF Callback: Cattura DMA completata durante acquisizione periodica! Calcolo dB...\r\n");
