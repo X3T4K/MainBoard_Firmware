@@ -10,7 +10,8 @@
 #include <stdio.h>
 
 /* Variabili globali per gestione audio */
-int32_t audio_buffer[AUDIO_SAMPLES];
+int32_t audio_buffer_peak[AUDIO_SAMPLES];
+int32_t audio_buffer_acq[AUDIO_SAMPLES];
 float_t rms_value;
 float_t dbfs_value;
 float_t dbspl_value;
@@ -77,8 +78,9 @@ void Mic_Stop(void)
  * @param buffer: Pointer to audio samples buffer (32-bit MDF data)
  * @param size: Number of samples in buffer
  */
-void Calculate_dB(int32_t *buffer, uint16_t size) 
+float Calculate_dB(int32_t *buffer, uint16_t size) 
 {
+    float rms_value, dbfs_value, dbspl_value;
     long long sum_sq = 0;
     
     for(int i = 0; i < size; i++) 
@@ -108,5 +110,6 @@ void Calculate_dB(int32_t *buffer, uint16_t size)
     } else {
         dbspl_value = 0.0f;
     }
+    return dbspl_value;
 }
 

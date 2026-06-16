@@ -8,7 +8,8 @@
 #define MDF_MAX_VAL               8388608.0f // Valore massimo per un segnale a 24 bit (2^23)
 
 /* Variabili globali */
-extern int32_t audio_buffer[AUDIO_SAMPLES];
+extern int32_t audio_buffer_peak[AUDIO_SAMPLES];
+extern int32_t audio_buffer_acq[AUDIO_SAMPLES];
 extern float_t rms_value;
 extern float_t dbfs_value;
 extern float_t dbspl_value;
@@ -18,5 +19,5 @@ extern float_t dbspl_value;
 void Mic_Start(void);
 void Mic_Stop(void);
 
-void Calculate_dB(int32_t *buffer, uint16_t size); 
+float Calculate_dB(int32_t *buffer, uint16_t size); 
 

@@ -37,7 +37,9 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-
+typedef struct __attribute__((packed)) {
+    float audio_level; // Livello audio in dBSPL
+} data_packet;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

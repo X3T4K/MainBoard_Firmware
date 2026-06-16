@@ -75,10 +75,11 @@ extern LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 // Registro di partenza (Nota: meglio uint8_t per registri I2C)
-uint8_t AS7341_start_register = 0x95; 
+//uint8_t AS7341_start_register = 0x95; 
 
 // Buffer in SRAM4 per LPBAM/DMA
-uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4"))); 
+//uint8_t AS7341_Rx_Buffer[12] __attribute__((section(".sram4")));
+//uint8_t IMP34DT05_Rx_Buffer[12] __attribute__((section(".sram4")));  
 
 // Offset per la gestione dei dati
 uint8_t DataBufferOffset = 0;
@@ -92,11 +93,11 @@ static AppState current_state = STATE_IDLE;
 uint8_t usb_flag = 0;
 
 // IMU data structures for accelerometer and gyroscope.
-static IMU_Data accelerometer_data;
-static IMU_Data gyroscope_data;
+//static IMU_Data accelerometer_data;
+//static IMU_Data gyroscope_data;
 
-uint8_t raw_accelerometer[6] = {0};
-uint8_t raw_gyroscope[6] = {0};
+//uint8_t raw_accelerometer[6] = {0};
+//uint8_t raw_gyroscope[6] = {0};
 
 /// ----- NAND FLASH variables ----- ///
 
@@ -116,9 +117,15 @@ uint8_t data_letto[4096] = {0};
 int exit_flag = 0;
 
 // Timestamp variables //
-Time_Struct timestamp;
+Time_Struct timestamp_monitoring;
+Time_Struct timestamp_peak;
 uint16_t tim = 0;
 
+// Sound Acquisition variables //
+static bool peak_detected = false;
+static bool acquisition_active = false;
+static float current_peak_dbspl = 0.0f;
+static float current_acquisition_dbspl = 0.0f;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -380,47 +387,40 @@ void SystemClock_Config(void)
   * This function is triggered by a hardware timer at a fixed interval.
   * @param  htim: Pointer to the timer handle.
   */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-	if(htim == &htim2){
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+  if(htim == &htim2){
+    
+    // Read raw data from microphone
+    if (MdfHandle0.State == HAL_MDF_STATE_READY)
+    {
+      acquisition_active = true;
 
-        // Read sensor data from the IMU
-        IMU_ReadAccelerometerData(&accelerometer_data, raw_accelerometer);
-        IMU_ReadGyroscopeData(&gyroscope_data, raw_gyroscope);
+      // 1. Accendi il LED di allerta
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
 
-        // Send the accelerometer and gyroscope data via BLE
-        // We are sending only the X-axis data
-        BLE_SendPacket(DATA_TYPE_IMU_ACCELERATION, raw_accelerometer);
-        //TODO: Change Gyro function
-        //BLE_SendPacket(DATA_TYPE_IMU_GYROSCOPE, (uint32_t)gyroscope_data.x);
+      printf("Inizio Monitoraggio Sonoro periodico! Avvio cattura DMA...\r\n");
+      
+      // 2. Fai partire una cattura rapida di campioni col Filtro 0 e salva in timestamp 
+      MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
+      mdfDmaConfig0.Address    = (uint32_t)&audio_buffer_acq[0];
+      mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_acq[0]);
+      mdfDmaConfig0.MsbOnly    = DISABLE;
 
-        // Save the raw accelerometer and gyroscope data in memory
-        // Create timestamp with sampling frequency @100 Hz
-        timestamp.sss=tim*10;
-		if(timestamp.sss == 1000) {
-			timestamp.ss=timestamp.ss+1;
-			timestamp.sss= 0;
-			tim = 0;
-			if (timestamp.ss==60){
-				timestamp.mm=timestamp.mm+1;
-				timestamp.ss=0;
-				if (timestamp.mm==60){
-					timestamp.hh=timestamp.hh+1;
-					timestamp.mm=0;
-				}
-			}
-		}
-
-		tim++;
-
-		// Create the data packet to be saved in memory
-		write_packet(sample, timestamp, raw_accelerometer, raw_gyroscope, NAND_packet);
-		sample++;
-		// Write data packet in memory
-        write_memory();
-
-	}
+      if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
+      {
+          Error_Handler();
+          acquisition_active = false; //Reset del flag in caso di errore
+      }
+      
+      RTC_TimeTypeDef sTime = {0};
+      RTC_DateTypeDef sDate = {0};
+      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+      timestamp_monitoring = {.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+    }
+  }
 }
+
 
 
 /**
@@ -432,10 +432,48 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == USER_BUTTON_Pin)
 	{
-		
-	}
-}
+		// A button press can trigger different state transitions depending on the current state.
+		switch(current_state) {
+			case STATE_IDLE:
+				// If the device is idle, start data acquisition.
+				// If the previous session wrote some data, circularly advance to the next good block
+				if (pagina_scritta > 0) {
+					b++;
+					if (b >= total_good_blocks || bad_blocks[b] == 0xFFFF) {
+						b = 0;
+					}
+					pagina_scritta = 0;
+				}
+				// Set up session boundary pointers
+				session_start_block = b;
+				session_start_page = pagina_scritta;
+				session_active = 0;
 
+				current_state = STATE_ACQUISITION;
+        printf("Starting data acquisition...\n");
+				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
+				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
+			break;
+			case STATE_ACQUISITION:
+				// If data acquisition is active, stop it.
+        button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
+				current_state = STATE_IDLE;
+				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
+
+				LED_Off(LED_GREEN); // Turn off the LED
+        printf("Data acquisition stopped by user.\n");
+				break;
+			case STATE_USB_CONNECTED:
+				// If USB is connected, start the download process.
+				exit_flag = 0;
+				current_state = STATE_DOWNLOAD;
+				break;
+			default:
+				// Do nothing for other states (e.g., if button is pressed during DOWNLOAD).
+				break;
+		}
+  }
+}
 // Falling Edge when User Button is not pressed
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 {
@@ -455,20 +493,31 @@ void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
         // Se c'è già una cattura in corso su Filtro 0, non facciamo nulla
         if (MdfHandle0.State == HAL_MDF_STATE_READY)
         {
-            // 1. Accendi il LED di allerta
-            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
-            
-            printf("MDF Callback: Superata soglia acustica! Avvio cattura DMA...\r\n");
-            
-            // 2. Fai partire una cattura rapida di campioni col Filtro 0  
-            MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
-            mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
-            mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
-            mdfDmaConfig0.MsbOnly    = DISABLE;
-            if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
-            {
-                Error_Handler();
-            }
+
+          peak_detected = true;
+
+          // 1. Accendi il LED di allerta
+          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
+          
+          printf("MDF Callback: Superata soglia acustica! Avvio cattura DMA...\r\n");
+          
+          // 2. Fai partire una cattura rapida di campioni col Filtro 0  
+          MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
+          mdfDmaConfig0.Address    = (uint32_t)&audio_buffer_peak[0];
+          mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_peak[0]);
+          mdfDmaConfig0.MsbOnly    = DISABLE;
+          if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
+          {
+              Error_Handler();
+              peak_detected = false; // Reset del flag in caso di errore
+          }
+
+          // Salva il timestamp del rilevamento del picco
+          RTC_TimeTypeDef sTime = {0};
+          RTC_DateTypeDef sDate = {0};
+          HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+          HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+          timestamp_peak = {.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
         }
     }
 }
@@ -478,46 +527,56 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
 {
     if (hmdf->Instance == MDF1_Filter0)
     {
-        // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
-        HAL_MDF_AcqStop(&MdfHandle0);
+        if(peak_detected) {
+          // Se questa callback è stata chiamata da una cattura rapida in seguito al rilevamento di un picco,
+          //  calcoliamo i dB e poi spegniamo il LED di allerta
 
-        // Spegni il LED di allerta
-        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+          printf("MDF Callback: Cattura DMA completata dopo rilevamento picco! Calcolo dB...\r\n");
+          peak_detected = false; // Reset del flag
 
-        // Calcola il valore di picco assoluto nel buffer corrente (valori a 24-bit allineati)
-        int32_t current_peak = 0;
-        for (int i = 0; i < AUDIO_SAMPLES; i++)
-        {
-            int32_t val = audio_buffer[i] >> 8;
-            if (val < 0) val = -val;
-            if (val > current_peak) current_peak = val;
+            // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
+          HAL_MDF_AcqStop(&MdfHandle0);
+
+          // Spegni il LED di allerta
+          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+
+          // Calcola il valore di picco assoluto nel buffer corrente (valori a 24-bit allineati)
+          int32_t current_peak = 0;
+          for (int i = 0; i < AUDIO_SAMPLES; i++)
+          {
+              int32_t val = audio_buffer_peak[i] >> 8;
+              if (val < 0) val = -val;
+              if (val > current_peak) current_peak = val;
+          }
+
+          // Se il picco corrente supera il massimo registrato, lo stampiamo
+          if (current_peak > global_max_peak)
+          {
+              global_max_peak = current_peak;
+              printf(">>> NUOVO PICCO RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
+          }
+
+          // Calcola anche i dB per riferimento
+          current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
+        } else if (acquisition_active) {
+
+          printf("MDF Callback: Cattura DMA completata durante acquisizione periodica! Calcolo dB...\r\n");
+          acquisition_active = false; // Reset del flag
+
+            // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
+          HAL_MDF_AcqStop(&MdfHandle0);
+
+          // Spegni il LED di allerta
+          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+
+          // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
+          current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
+
+          write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
+          sample++;
+
         }
-
-        // Se il picco corrente supera il massimo registrato, lo stampiamo
-        if (current_peak > global_max_peak)
-        {
-            global_max_peak = current_peak;
-            printf(">>> NUOVO PICCO RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
-        }
-
-        // Calcola anche i dB per riferimento
-        Calculate_dB(audio_buffer, AUDIO_SAMPLES);
-        
-        // Stampa il valore con segno ed i decimali calcolati in modo sicuro
-        /*printf("dBFS: %d.%02d | dBSPL: %d.%02d (Picco corrente: %ld)\r\n", 
-               (int)dbfs_value, (int)(fabsf(dbfs_value) * 100.0f) % 100, 
-               (int)dbspl_value, (int)(fabsf(dbspl_value) * 100.0f) % 100,
-               (long)current_peak);*/
-        
-        // Riavvia subito il monitoraggio continuo (Filtro 0 DMA)
-        MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
-        mdfDmaConfig0.Address    = (uint32_t)&audio_buffer[0];
-        mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer[0]);
-        mdfDmaConfig0.MsbOnly    = DISABLE;
-        if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
-        {
-            Error_Handler();
-        }
+        write_memory(); // Salva su NAND Flash
     }
 }
 
