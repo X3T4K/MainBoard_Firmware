@@ -170,6 +170,8 @@ int block_erase(read_address_t row, uint32_t timeout);
 void write_memory();
 void read_memory_and_transmit();
 void erase_memory();
+void flush_memory();
+void Debug_Read_And_Print_Nand();
 
 void cs_select(void);
 void cs_deselect(void);

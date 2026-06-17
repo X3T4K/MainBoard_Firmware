@@ -15,8 +15,10 @@
 #include "SPI.h"
 #include "SPI_NAND.h"
 
-#define BYTES_PER_SAMPLE 17 // 
-#define SAMPLES_PER_PAGE 409 // 4096/BYTES_PER_SAMPLE rounded
+#define BYTES_PER_SAMPLE 9 // 3 bytes time + 2 bytes ms + 4 bytes float
+#define SAMPLES_PER_PAGE 455 // 4096/BYTES_PER_SAMPLE rounded
+
+extern uint16_t total_good_blocks;
 
 typedef struct bookmark
 {

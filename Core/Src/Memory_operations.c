@@ -48,6 +48,12 @@ void find_bad_blocks(uint16_t *bad_blocks){
 		}
 
 	}
+
+	// Pad remaining unpopulated elements of bad_blocks with 0xFFFF (invalid block marker)
+	for (int k = j; k < 2048; k++) {
+		bad_blocks[k] = 0xFFFF;
+	}
+	total_good_blocks = j; // Store the exact count of discovered good blocks
 }
 
 // Questo da tenere così
@@ -77,9 +83,10 @@ void write_packet(uint16_t sample, Time_Struct timestamp, float microphone, uint
 	NAND_packet[0 + offset] = timestamp.hh;
 	NAND_packet[1 + offset] = timestamp.mm;
 	NAND_packet[2 + offset] = timestamp.ss;
+	NAND_packet[3 + offset] = (timestamp.sss >> 8) & 0xFF;
+	NAND_packet[4 + offset] = timestamp.sss & 0xFF;
 
-	NAND_packet[3 + offset] = (uint16_t)(microphone & 0xFFFF);       // low
-	NAND_packet[4 + offset] = (uint16_t)((microphone >> 16) & 0xFFFF); // high
+	memcpy(&NAND_packet[5 + offset], &microphone, sizeof(float));
 }
 
 

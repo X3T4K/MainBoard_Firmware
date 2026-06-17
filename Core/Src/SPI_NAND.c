@@ -45,7 +45,10 @@ extern uint8_t bad_blocks2[2048];
 extern uint8_t data_letto[4096];
 extern int exit_flag;
 
-static AppState current_state;
+extern volatile AppState current_state;
+extern uint16_t session_start_block;
+extern uint8_t session_start_page;
+extern uint16_t total_good_blocks;
 
 // SPI basic functions
 void cs_deselect(void);
@@ -725,6 +728,14 @@ void write_memory()
 		if(pagina_scritta >= 64){ // End of the block, increment block
 			pagina_scritta = 0;
 			b++;
+			
+			// Erase the new block
+			read_address_t erase_addr;
+			erase_addr.block = bad_blocks[b];
+			erase_addr.page = 0;
+			erase_addr.dummy = 0;
+			printf("[NAND] Erasing new block %u...\r\n", erase_addr.block);
+			spi_nand_block_erase(erase_addr);
 		}
 
 		if(b==2048){ // memory full
@@ -738,7 +749,10 @@ void write_memory()
 		blocco.dummy = 0;
 		colonna = 0;
 
-		spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
+		int prog_status = spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
+		if (prog_status != SPI_NAND_RET_OK) {
+			printf("[NAND ERROR] Page program failed! Block: %d, Page: %d, Code: %d\r\n", (int)blocco_scritto, (int)pagina_scritta, prog_status);
+		}
 
 		pagina_scritta++;
 
@@ -781,6 +795,116 @@ void read_memory_and_transmit()
 void erase_memory()
 {
 	erase_good_blocks(bad_blocks2); // Erase bad_blocks (set all memory to 0xFF)
+}
+
+void flush_memory(void)
+{
+	if(sample > 0){
+		if(pagina_scritta >= 64){
+			pagina_scritta = 0;
+			b++;
+			
+			// Erase the new block
+			read_address_t erase_addr;
+			erase_addr.block = bad_blocks[b];
+			erase_addr.page = 0;
+			erase_addr.dummy = 0;
+			printf("[NAND] Erasing new block %u (flush)...\r\n", erase_addr.block);
+			spi_nand_block_erase(erase_addr);
+		}
+		if(b==2048){
+			current_state = STATE_IDLE;
+			return;
+		}
+		blocco_scritto = bad_blocks[b];
+		blocco.block = blocco_scritto;
+		blocco.page = pagina_scritta;
+		blocco.dummy = 0;
+		colonna = 0;
+
+		int prog_status = spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
+		if (prog_status != SPI_NAND_RET_OK) {
+			printf("[NAND ERROR] Page program (flush) failed! Block: %d, Page: %d, Code: %d\r\n", (int)blocco_scritto, (int)pagina_scritta, prog_status);
+		}
+		pagina_scritta++;
+		sample = 0;
+		memset(NAND_packet, 0, sizeof(NAND_packet));
+	}
+}
+
+
+
+void Debug_Read_And_Print_Nand(void)
+{
+    printf("\r\n==================================================\r\n");
+    printf("[NAND DEBUG] Lettura Dati Acquisiti in questa Sessione...\r\n");
+    printf("Sessione da Blocco %u (Pag %u) a Blocco %u (Pag %u)\r\n", 
+           session_start_block, session_start_page, b, pagina_scritta);
+    printf("==================================================\r\n");
+
+    read_address_t debug_block;
+    debug_block.dummy = 0;
+    
+    uint16_t blk = session_start_block;
+    uint8_t start_pag = session_start_page;
+    uint32_t total_packets_printed = 0;
+    
+    bool finished = false;
+    while (!finished) {
+        debug_block.block = bad_blocks[blk];
+        if (debug_block.block == 0xFFFF) {
+            break;
+        }
+        
+        uint8_t end_pag = (blk == b) ? pagina_scritta : 64;
+        for (uint8_t pag = start_pag; pag < end_pag; pag++) {
+            debug_block.page = pag;
+            
+            int ret = spi_nand_page_read(debug_block, 0, data_letto, sizeof(data_letto));
+            if (ret != SPI_NAND_RET_OK) {
+                printf("[NAND DEBUG] Errore lettura: Blocco %u, Pag %u (Ret=%d)\r\n", 
+                       debug_block.block, pag, ret);
+                continue;
+            }
+            
+            // Se la pagina è completamente vuota (timestamp 0xFF/0xFF/0xFF), saltiamo/usciamo
+            if (data_letto[0] == 0xFF && data_letto[1] == 0xFF && data_letto[2] == 0xFF) {
+                finished = true;
+                break;
+            }
+            
+            for (uint16_t smp = 0; smp < SAMPLES_PER_PAGE; smp++) {
+                uint32_t offset = smp * BYTES_PER_SAMPLE;
+                uint8_t hh = data_letto[0 + offset];
+                uint8_t mm = data_letto[1 + offset];
+                uint8_t ss = data_letto[2 + offset];
+                uint16_t ms = ((uint16_t)data_letto[3 + offset] << 8) | data_letto[4 + offset];
+                
+                // Se incontriamo un pacchetto non scritto (timestamp 0xFF), ci fermiamo
+                if (hh == 0xFF && mm == 0xFF && ss == 0xFF && ms == 0xFFFF) {
+                    break;
+                }
+                
+                float db_val;
+                memcpy(&db_val, &data_letto[5 + offset], sizeof(float));
+                
+                printf("  [%05lu] Ora: %02d:%02d:%02d.%03d | Mic: %.2f dBSPL\r\n",
+                       (unsigned long)total_packets_printed, hh, mm, ss, (int)ms, db_val);
+                total_packets_printed++;
+            }
+        }
+        
+        if (blk == b) {
+            finished = true;
+        } else {
+            blk++;
+            if (blk >= total_good_blocks || bad_blocks[blk] == 0xFFFF) {
+                blk = 1024; // wrap within upper half of memory
+            }
+            start_pag = 0; // i blocchi successivi partono da pagina 0
+        }
+    }
+    printf("==================================================\r\n\r\n");
 }
 
 

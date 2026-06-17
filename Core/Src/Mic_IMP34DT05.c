@@ -100,13 +100,9 @@ float Calculate_dB(int32_t *buffer, uint16_t size)
         // Se MDF_MAX_VAL è corretto per il Sinc5, dbfs_value sarà perfetto
         dbfs_value = 20.0f * log10f(rms_value / MDF_MAX_VAL);
         if (dbfs_value > 0.0f) dbfs_value = 0.0f; 
-    } else {
-        dbfs_value = -100.0f;
-    }
-
-    if (dbfs_value > -100.0f) {
-        // La conversione acustica dBSPL non cambia, perché si basa sulla proporzione lineare
+        
         dbspl_value = dbfs_value - MIC_DIGITAL_SENSITIVITY_DBFS + 94.0f;
+        if (dbspl_value < 0.0f) dbspl_value = 0.0f; // Limit representation to positive dBSPL
     } else {
         dbspl_value = 0.0f;
     }

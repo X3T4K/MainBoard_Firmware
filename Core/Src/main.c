@@ -29,6 +29,7 @@
 #include "lpdma.h"
 #include "lptim.h"
 #include "mdf.h"
+#include "rtc.h"
 #include "spi.h"
 #include "tim.h"
 #include "usart.h"
@@ -48,8 +49,6 @@
 #include "bluetooth.h"
 #include "Mic_IMP34DT05.h"
 #include "Spec_AS7341.h"
-#include "lpbam_i2c_spec.h"
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,7 +81,7 @@
 uint8_t DataBufferOffset = 0;
 // --- State Machine ---
 // The current state of the application. Initial state is IDLE.
-static AppState current_state = STATE_IDLE;
+volatile AppState current_state = STATE_IDLE;
 
 // --- Global Flags and Variables ---
 // Flag to indicate a USB connection event.
@@ -98,8 +97,17 @@ uint8_t usb_flag = 0;
 
 /// ----- NAND FLASH variables ----- ///
 
+__attribute__((section(".sram4_retention"))) volatile uint8_t button_force_stop;
+__attribute__((section(".sram4_retention"))) uint16_t total_good_blocks;
+__attribute__((section(".sram4_retention"))) uint16_t session_start_block;
+__attribute__((section(".sram4_retention"))) uint8_t session_start_page;
+__attribute__((section(".sram4_retention"))) uint8_t session_active;
+
+extern DMA_HandleTypeDef handle_GPDMA1_Channel0;
+
 uint8_t NAND_packet[4096] = {0};
 uint16_t sample = 0;
+uint32_t global_sample_count = 0;
 uint16_t blocco_scritto = 0;
 uint8_t pagina_scritta=0;
 uint16_t b = 1024; // start writing continuous audio data from middle of NAND
@@ -193,7 +201,18 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM1_Init();
   MX_USB_OTG_FS_PCD_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+/* USER CODE BEGIN 2 */
+
+
+  // Cold start initialization for SRAM4 retention variables (NOLOAD)
+  button_force_stop = 0;
+  total_good_blocks = 0;
+  session_start_block = 0;
+  session_start_page = 0;
+  session_active = 0;
+
   printf("\r\n--- MainBoard IMU Logger ---\r\n");
   // Turn the RED LED on to indicate the start of the initialization process
   LED_On(LED_RED);
@@ -202,6 +221,7 @@ int main(void)
   BLE_Initialize();
   MX_USB_Device_Init();
   HAL_Delay(1000);
+
 
   spi_nand_init();
   find_bad_blocks(bad_blocks); // find bad_blocks and save them
@@ -232,12 +252,6 @@ int main(void)
   LED_Off(LED_RED);
 
   SPEC_Init(); // Inizializza il sensore AS7341
-  // LPBAM I2C Spec Setup
-  MX_I2C_Spec_Init();                                     // Inizializza l'applicazione base
-  MX_I2C_Spec_I2C_RX_Init();                              // Inizializza il tuo scenario
-  MX_I2C_Spec_I2C_RX_Build();                             // Costruisce la Linked List in memoria
-  MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
-  MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0);      // Avvia l'attesa del trigger (Timer)
   HAL_DBGMCU_DisableDBGStopMode();
   __HAL_RCC_PWR_CLK_ENABLE();
   /* USER CODE BEGIN MDF Start */
@@ -345,9 +359,12 @@ void SystemClock_Config(void)
 
   /** Initializes the CPU, AHB and APB buses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI|RCC_OSCILLATORTYPE_HSE
+                              |RCC_OSCILLATORTYPE_LSE;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+  RCC_OscInitStruct.LSIDiv = RCC_LSI_DIV1;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLMBOOST = RCC_PLLMBOOST_DIV2;
@@ -388,8 +405,10 @@ void SystemClock_Config(void)
   */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   if(htim == &htim2){
+    printf("Size of audio_buffer_acq: %lu bytes\r\n", (unsigned long)sizeof(audio_buffer_acq));
     
     // Read raw data from microphone
+    printf("[DEBUG] TIM2 Callback! MdfHandle0.State = %d\r\n", (int)MdfHandle0.State);
     if (MdfHandle0.State == HAL_MDF_STATE_READY)
     {
       acquisition_active = true;
@@ -415,7 +434,18 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
       RTC_DateTypeDef sDate = {0};
       HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
       HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-      timestamp_monitoring = {.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+      timestamp_monitoring = (Time_Struct){.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+
+    }
+    else if (MdfHandle0.State == HAL_MDF_STATE_ACQUISITION)
+    {
+      printf("[DMA DEBUG] State=%d, Error=0x%08lx, RemainingBytes=%ld, CSR=0x%08lx, CSAR=0x%08lx, CDAR=0x%08lx\r\n",
+             (int)handle_GPDMA1_Channel0.State,
+             (unsigned long)handle_GPDMA1_Channel0.ErrorCode,
+             (long)(GPDMA1_Channel0->CBR1 & 0x3FFFF),
+             (unsigned long)GPDMA1_Channel0->CSR,
+             (unsigned long)GPDMA1_Channel0->CSAR,
+             (unsigned long)GPDMA1_Channel0->CDAR);
     }
   }
 }
@@ -447,20 +477,32 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				session_start_block = b;
 				session_start_page = pagina_scritta;
 				session_active = 0;
+				global_sample_count = 0;
 
 				current_state = STATE_ACQUISITION;
-        printf("Starting data acquisition...\n");
-				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
+        printf("Starting data acquisition (POLLING mode)...\n");
+				
+				// Erase the initial block to prepare for sequential writes
+				read_address_t erase_addr;
+				erase_addr.block = bad_blocks[b];
+				erase_addr.page = 0;
+				erase_addr.dummy = 0;
+				printf("[NAND] Erasing start block %u...\r\n", erase_addr.block);
+				spi_nand_block_erase(erase_addr);
+
+				// HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
 				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
 			break;
 			case STATE_ACQUISITION:
 				// If data acquisition is active, stop it.
         button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
 				current_state = STATE_IDLE;
-				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
+				// HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
 
 				LED_Off(LED_GREEN); // Turn off the LED
         printf("Data acquisition stopped by user.\n");
+        flush_memory();
+        Debug_Read_And_Print_Nand();
 				break;
 			case STATE_USB_CONNECTED:
 				// If USB is connected, start the download process.
@@ -516,7 +558,8 @@ void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
           RTC_DateTypeDef sDate = {0};
           HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
           HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-          timestamp_peak = {.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+          timestamp_peak = (Time_Struct){.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
+
         }
     }
 }
@@ -570,7 +613,14 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
           HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
 
           // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
+          printf("[DEBUG] Primi campioni acquisiti: [0]=%ld, [1]=%ld, [2]=%ld\r\n", 
+                 (long)audio_buffer_acq[0], 
+                 (long)audio_buffer_acq[1], 
+                 (long)audio_buffer_acq[2]);
           current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
+          printf("[Acquisition] Campione salvato: %02d:%02d:%02d -> %.2f dBSPL (Totale: %d)\r\n",
+                 timestamp_monitoring.hh, timestamp_monitoring.mm, timestamp_monitoring.ss,
+                 current_acquisition_dbspl, sample);
 
           write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
           sample++;
