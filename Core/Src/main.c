@@ -262,26 +262,10 @@ int main(void)
   HAL_Delay(50);
   Mic_Start();
   HAL_Delay(100);
-  printf("MDF1 Base: GCR=0x%08X, CKGCR=0x%08X\r\n", (unsigned int)MDF1->GCR, (unsigned int)MDF1->CKGCR);
-  printf("RCC Regs: CR=0x%08X, PLL3CFGR=0x%08X, PLL3DIVR=0x%08X, CCIPR2=0x%08X\r\n",
-         (unsigned int)RCC->CR, (unsigned int)RCC->PLL3CFGR, (unsigned int)RCC->PLL3DIVR, (unsigned int)RCC->CCIPR2);
-  printf("MDF1_FLT1: DFLTCR=0x%08X, DFLTCICR=0x%08X, DFLTIER=0x%08X, DFLTISR=0x%08X\r\n", 
-         (unsigned int)MdfHandle1.Instance->DFLTCR, (unsigned int)MdfHandle1.Instance->DFLTCICR, 
-         (unsigned int)MdfHandle1.Instance->DFLTIER, (unsigned int)MdfHandle1.Instance->DFLTISR);
-  printf("MDF1_FLT1 OLD: OLDCR=0x%08X, OLDTHLR=0x%08X, OLDTHHR=0x%08X, DFLTDR=0x%08X\r\n", 
-         (unsigned int)MdfHandle1.Instance->OLDCR, (unsigned int)MdfHandle1.Instance->OLDTHLR, 
-         (unsigned int)MdfHandle1.Instance->OLDTHHR, (unsigned int)MdfHandle1.Instance->DFLTDR);
-  HAL_Delay(100);
-  printf("System: Ingresso in SLEEP.\r\n");
-  HAL_Delay(50);
   /* USER CODE END MDF Start */
 
   HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI); // wake up only when there is an interrupt
 
-  printf("System: Risvegliato da SLEEP!\r\n");
-  HAL_Delay(50);
-  printf("MDF1_FLT1 Post-SLEEP: DFLTISR=0x%08X, DFLTDR=0x%08X\r\n", 
-         (unsigned int)MdfHandle1.Instance->DFLTISR, (unsigned int)MdfHandle1.Instance->DFLTDR);
   HAL_Delay(50);
   /* USER CODE END 2 */
 
@@ -314,9 +298,80 @@ int main(void)
 	  		break;
 
 	  	  case STATE_ACQUISITION:
-	  		   // All data acquisition is handled by the timer interrupt
+	  		   // Polling acquisition
+	  		   {
+	  		       int count = 0;
+	  		       if (MdfHandle0.State == HAL_MDF_STATE_READY) {
+	  		           if (HAL_MDF_AcqStart(&MdfHandle0, &MdfFilterConfig0) != HAL_OK) {
+	  		               printf("[POLLING] Error starting MDF acquisition!\r\n");
+	  		               HAL_Delay(1000);
+	  		           } else {
+	  		               button_force_stop = 0;
+	  		           }
+	  		       }
+	  		       
+	  		       if (MdfHandle0.State == HAL_MDF_STATE_ACQUISITION) {
+	  		           int32_t val;
+	  		           int poll_fail_count = 0;
+	  		           while (count < AUDIO_SAMPLES && current_state == STATE_ACQUISITION) {
+	  		               HAL_StatusTypeDef poll_status = HAL_MDF_PollForAcq(&MdfHandle0, 10);
+	  		               if (poll_status == HAL_OK) {
+	  		                   if (HAL_MDF_GetAcqValue(&MdfHandle0, &val) == HAL_OK) {
+	  		                       audio_buffer_acq[count] = val;
+	  		                       count++;
+	  		                   }
+	  		               } else {
+	  		                   poll_fail_count++;
+	  		                   if (poll_fail_count <= 5) {
+	  		                       printf("[POLLING FAIL] PollForAcq returned %d (MDF State=%d, MDF Error=0x%08lx)\r\n", 
+	  		                              (int)poll_status, (int)HAL_MDF_GetState(&MdfHandle0), (unsigned long)HAL_MDF_GetError(&MdfHandle0));
+	  		                   }
+	  		                   HAL_Delay(10);
+	  		               }
+	  		               
+	  		               if (button_force_stop == 1) {
+	  		                   break;
+	  		               }
+	  		           }
+	  		       }
+	  		           
+	  		       HAL_MDF_AcqStop(&MdfHandle0);
+	  		           
+	  		       if (count == AUDIO_SAMPLES) {
+	  		           current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
+	  		               
+	  		           RTC_TimeTypeDef sTime = {0};
+	  		           RTC_DateTypeDef sDate = {0};
+	  		           HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+	  		           HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	  		           uint16_t ms = 0;
+	  		           if (sTime.SecondFraction > 0) {
+	  		               ms = (uint16_t)(((sTime.SecondFraction - sTime.SubSeconds) * 1000) / (sTime.SecondFraction + 1));
+	  		           }
+	  		           timestamp_monitoring = (Time_Struct){
+	  		               .hh = sTime.Hours,
+	  		               .mm = sTime.Minutes,
+	  		               .ss = sTime.Seconds,
+	  		               .sss = ms
+	  		           };
 
-			break;
+	  		           static uint32_t last_print_tick = 0;
+	  		           uint32_t current_tick = HAL_GetTick();
+	  		           if (current_tick - last_print_tick >= 1000) {
+	  		               last_print_tick = current_tick;
+	  		               printf("[MIC SAMPLING] Captured: %.2f dBSPL | Time: %02d:%02d:%02d.%03d | RAM Buffer Index: %d/%d (Session Total: %lu)\r\n", 
+	  		                      current_acquisition_dbspl,
+	  		                      timestamp_monitoring.hh, timestamp_monitoring.mm, timestamp_monitoring.ss, timestamp_monitoring.sss,
+	  		                      sample + 1, SAMPLES_PER_PAGE, (unsigned long)(global_sample_count + 1));
+	  		           }
+	  		               
+	  		           write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet);
+	  		           sample++;
+	  		           global_sample_count++;
+	  		           write_memory();
+	  		       }
+	  		   }
+	  		   break;
 
 	  	  case STATE_USB_CONNECTED:
 	  		break;
@@ -480,14 +535,14 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				global_sample_count = 0;
 
 				current_state = STATE_ACQUISITION;
-        printf("Starting data acquisition (POLLING mode)...\n");
+				printf("\r\n>>> MIC MONITORING STARTED (POLLING MODE) <<<\r\n");
 				
 				// Erase the initial block to prepare for sequential writes
 				read_address_t erase_addr;
 				erase_addr.block = bad_blocks[b];
 				erase_addr.page = 0;
 				erase_addr.dummy = 0;
-				printf("[NAND] Erasing start block %u...\r\n", erase_addr.block);
+				printf("[NAND FLASH ERASE] Erasing start block %u (physical) to prepare session...\r\n", erase_addr.block);
 				spi_nand_block_erase(erase_addr);
 
 				// HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
@@ -495,14 +550,14 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 			break;
 			case STATE_ACQUISITION:
 				// If data acquisition is active, stop it.
-        button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
+				button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
 				current_state = STATE_IDLE;
 				// HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
 
 				LED_Off(LED_GREEN); // Turn off the LED
-        printf("Data acquisition stopped by user.\n");
-        flush_memory();
-        Debug_Read_And_Print_Nand();
+				printf("\r\n>>> MIC MONITORING STOPPED BY USER <<<\r\n");
+				flush_memory();
+				Debug_Read_And_Print_Nand();
 				break;
 			case STATE_USB_CONNECTED:
 				// If USB is connected, start the download process.
@@ -612,15 +667,15 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
           // Spegni il LED di allerta
           HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
 
-          // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
           printf("[DEBUG] Primi campioni acquisiti: [0]=%ld, [1]=%ld, [2]=%ld\r\n", 
                  (long)audio_buffer_acq[0], 
                  (long)audio_buffer_acq[1], 
                  (long)audio_buffer_acq[2]);
           current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
-          printf("[Acquisition] Campione salvato: %02d:%02d:%02d -> %.2f dBSPL (Totale: %d)\r\n",
+          printf("[MIC SENSOR ACTIVE] DMA Captured: %.2f dBSPL | Time: %02d:%02d:%02d | RAM Buffer Index: %d/%d\r\n",
+                 current_acquisition_dbspl,
                  timestamp_monitoring.hh, timestamp_monitoring.mm, timestamp_monitoring.ss,
-                 current_acquisition_dbspl, sample);
+                 sample + 1, SAMPLES_PER_PAGE);
 
           write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
           sample++;

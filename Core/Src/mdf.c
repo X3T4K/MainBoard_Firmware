@@ -52,7 +52,7 @@ void MX_MDF1_Init(void)
   MdfHandle0.Init.CommonParam.OutputClock.Activation = ENABLE;
   MdfHandle0.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
   MdfHandle0.Init.CommonParam.OutputClock.Divider = 5;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
+  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
   MdfHandle0.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
   MdfHandle0.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
   MdfHandle0.Init.SerialInterface.Activation = ENABLE;
@@ -84,11 +84,9 @@ void MX_MDF1_Init(void)
   MdfFilterConfig0.Integrator.Value = 2;
   MdfFilterConfig0.Integrator.OutputDivision = MDF_INTEGRATOR_OUTPUT_DIV_128;
   MdfFilterConfig0.SoundActivity.Activation = DISABLE;
-  MdfFilterConfig0.AcquisitionMode = MDF_MODE_SYNC_CONT;
+  MdfFilterConfig0.AcquisitionMode = MDF_MODE_ASYNC_CONT;
   MdfFilterConfig0.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
   MdfFilterConfig0.DiscardSamples = 255;
-  MdfFilterConfig0.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
-  MdfFilterConfig0.Trigger.Edge = MDF_FILTER_TRIG_RISING_EDGE;
 
   /**
     MdfHandle1 structure initialization and HAL_MDF_Init function call
@@ -99,7 +97,7 @@ void MX_MDF1_Init(void)
   MdfHandle1.Init.CommonParam.OutputClock.Activation = ENABLE;
   MdfHandle1.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
   MdfHandle1.Init.CommonParam.OutputClock.Divider = 5;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
   MdfHandle1.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
   MdfHandle1.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
   MdfHandle1.Init.SerialInterface.Activation = DISABLE;
@@ -162,7 +160,7 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     PeriphClkInit.PLL3.PLL3R = 2;
     PeriphClkInit.PLL3.PLL3RGE = RCC_PLLVCIRANGE_1;
     PeriphClkInit.PLL3.PLL3FRACN = 0;
-    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVP;
+    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVQ;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
     {
       Error_Handler();
@@ -199,7 +197,7 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     handle_GPDMA1_Channel0.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
     handle_GPDMA1_Channel0.Init.Direction = DMA_PERIPH_TO_MEMORY;
     handle_GPDMA1_Channel0.Init.SrcInc = DMA_SINC_FIXED;
-    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_FIXED;
+    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_INCREMENTED;
     handle_GPDMA1_Channel0.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_WORD;
     handle_GPDMA1_Channel0.Init.DestDataWidth = DMA_DEST_DATAWIDTH_WORD;
     handle_GPDMA1_Channel0.Init.Priority = DMA_LOW_PRIORITY_LOW_WEIGHT;

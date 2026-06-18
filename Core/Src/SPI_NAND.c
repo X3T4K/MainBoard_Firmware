@@ -734,7 +734,7 @@ void write_memory()
 			erase_addr.block = bad_blocks[b];
 			erase_addr.page = 0;
 			erase_addr.dummy = 0;
-			printf("[NAND] Erasing new block %u...\r\n", erase_addr.block);
+			printf("[NAND FLASH ERASE] Page boundary overflow. Erasing block %u (physical) for next page writes...\r\n", erase_addr.block);
 			spi_nand_block_erase(erase_addr);
 		}
 
@@ -752,6 +752,8 @@ void write_memory()
 		int prog_status = spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
 		if (prog_status != SPI_NAND_RET_OK) {
 			printf("[NAND ERROR] Page program failed! Block: %d, Page: %d, Code: %d\r\n", (int)blocco_scritto, (int)pagina_scritta, prog_status);
+		} else {
+			printf("[NAND FLASH SAVE] Successfully programmed 4096 bytes to Flash memory -> Block: %u (physical: %u), Page: %u\r\n", (unsigned int)b, (unsigned int)blocco_scritto, (unsigned int)pagina_scritta);
 		}
 
 		pagina_scritta++;
@@ -809,7 +811,7 @@ void flush_memory(void)
 			erase_addr.block = bad_blocks[b];
 			erase_addr.page = 0;
 			erase_addr.dummy = 0;
-			printf("[NAND] Erasing new block %u (flush)...\r\n", erase_addr.block);
+			printf("[NAND FLASH ERASE] Page boundary overflow on flush. Erasing block %u (physical)...\r\n", erase_addr.block);
 			spi_nand_block_erase(erase_addr);
 		}
 		if(b==2048){
@@ -825,6 +827,8 @@ void flush_memory(void)
 		int prog_status = spi_nand_page_program(blocco, colonna, NAND_packet, 4096);
 		if (prog_status != SPI_NAND_RET_OK) {
 			printf("[NAND ERROR] Page program (flush) failed! Block: %d, Page: %d, Code: %d\r\n", (int)blocco_scritto, (int)pagina_scritta, prog_status);
+		} else {
+			printf("[NAND FLASH FLUSH] Successfully flushed remaining %u samples to Flash -> Block: %u (physical: %u), Page: %u\r\n", (unsigned int)sample, (unsigned int)b, (unsigned int)blocco_scritto, (unsigned int)pagina_scritta);
 		}
 		pagina_scritta++;
 		sample = 0;
@@ -836,11 +840,12 @@ void flush_memory(void)
 
 void Debug_Read_And_Print_Nand(void)
 {
-    printf("\r\n==================================================\r\n");
-    printf("[NAND DEBUG] Lettura Dati Acquisiti in questa Sessione...\r\n");
-    printf("Sessione da Blocco %u (Pag %u) a Blocco %u (Pag %u)\r\n", 
-           session_start_block, session_start_page, b, pagina_scritta);
-    printf("==================================================\r\n");
+    printf("\r\n====================================================================\r\n");
+    printf("                  NAND FLASH DATA DUMP REPORT                       \r\n");
+    printf("====================================================================\r\n");
+    printf("  Session start: Block %u (physical index: %u), Page %u\r\n", session_start_block, bad_blocks[session_start_block], session_start_page);
+    printf("  Session end:   Block %u (physical index: %u), Page %u\r\n", b, bad_blocks[b], pagina_scritta);
+    printf("--------------------------------------------------------------------\r\n");
 
     read_address_t debug_block;
     debug_block.dummy = 0;
@@ -848,6 +853,10 @@ void Debug_Read_And_Print_Nand(void)
     uint16_t blk = session_start_block;
     uint8_t start_pag = session_start_page;
     uint32_t total_packets_printed = 0;
+    
+    float db_min = 999.0f;
+    float db_max = -999.0f;
+    double db_sum = 0.0;
     
     bool finished = false;
     while (!finished) {
@@ -875,21 +884,37 @@ void Debug_Read_And_Print_Nand(void)
             
             for (uint16_t smp = 0; smp < SAMPLES_PER_PAGE; smp++) {
                 uint32_t offset = smp * BYTES_PER_SAMPLE;
+                
+                // Check if the sample is completely padded with zeros
+                bool is_zero = true;
+                for (int b_idx = 0; b_idx < BYTES_PER_SAMPLE; b_idx++) {
+                    if (data_letto[offset + b_idx] != 0) {
+                        is_zero = false;
+                        break;
+                    }
+                }
+                
                 uint8_t hh = data_letto[0 + offset];
                 uint8_t mm = data_letto[1 + offset];
                 uint8_t ss = data_letto[2 + offset];
                 uint16_t ms = ((uint16_t)data_letto[3 + offset] << 8) | data_letto[4 + offset];
                 
-                // Se incontriamo un pacchetto non scritto (timestamp 0xFF), ci fermiamo
-                if (hh == 0xFF && mm == 0xFF && ss == 0xFF && ms == 0xFFFF) {
+                // Stop printing if we hit an erased sample (0xFF) or padding (all 0s)
+                if (is_zero || (hh == 0xFF && mm == 0xFF && ss == 0xFF && ms == 0xFFFF)) {
                     break;
                 }
                 
                 float db_val;
                 memcpy(&db_val, &data_letto[5 + offset], sizeof(float));
                 
-                printf("  [%05lu] Ora: %02d:%02d:%02d.%03d | Mic: %.2f dBSPL\r\n",
-                       (unsigned long)total_packets_printed, hh, mm, ss, (int)ms, db_val);
+                if (db_val < db_min) db_min = db_val;
+                if (db_val > db_max) db_max = db_val;
+                db_sum += db_val;
+                if(total_packets_printed%10 == 0) {
+					printf("  Sample #%05lu | Timestamp: %02d:%02d:%02d.%03d | Noise Level: %.2f dBSPL\r\n",
+                       (unsigned long)(total_packets_printed + 1), hh, mm, ss, (int)ms, db_val);
+                
+				}
                 total_packets_printed++;
             }
         }
@@ -904,7 +929,13 @@ void Debug_Read_And_Print_Nand(void)
             start_pag = 0; // i blocchi successivi partono da pagina 0
         }
     }
-    printf("==================================================\r\n\r\n");
+    printf("====================================================================\r\n");
+    printf("  NAND Dump Completed. Total Valid Samples Recovered: %lu\r\n", (unsigned long)total_packets_printed);
+    if (total_packets_printed > 0) {
+        float db_avg = (float)(db_sum / total_packets_printed);
+        printf("  Session Statistics -> Min: %.2f | Max: %.2f | Average: %.2f dBSPL\r\n", db_min, db_max, db_avg);
+    }
+    printf("====================================================================\r\n\r\n");
 }
 
 
