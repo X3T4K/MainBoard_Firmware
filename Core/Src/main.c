@@ -582,6 +582,12 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
           // Spegni il LED di allerta
           HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
 
+          // All'inizio della callback del picco, verifichi il cooldown energetico
+          if (Mic_ApplyCooldownProtection() == 0) 
+          {
+            return; // Salta l'elaborazione se siamo sommersi da troppi interrupt vicini
+          }
+
           // Calcola il valore di picco assoluto nel buffer corrente (valori a 24-bit allineati)
           int32_t current_peak = 0;
           for (int i = 0; i < AUDIO_SAMPLES; i++)
@@ -596,12 +602,6 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
           {
               global_max_peak = current_peak;
               printf(">>> NUOVO PICCO GLOBALE RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
-          }
-
-          // All'inizio della callback del picco, verifichi il cooldown energetico
-          if (Mic_ApplyCooldownProtection() == 0) 
-          {
-            return; // Salta l'elaborazione se siamo sommersi da troppi interrupt vicini
           }
 
           // Calcola anche i dB per riferimento
