@@ -1,3 +1,6 @@
+#ifndef MIC_IMP34DT05_H
+#define MIC_IMP34DT05_H
+
 #include "main.h" // Per avere accesso ai tipi base di STM32
 
 /* Definizioni */
@@ -21,3 +24,20 @@ void Mic_Stop(void);
 
 float Calculate_dB(int32_t *buffer, uint16_t size); 
 
+/**
+ * @brief Stampa la diagnostica dei picchi acustici per la fascia DIURNA.
+ */
+void Mic_AnalyzePeak_Daytime(float_t dbspl_val);
+
+/**
+ * @brief Stampa la diagnostica dei picchi acustici per la fascia NOTTURNA.
+ */
+void Mic_AnalyzePeak_Nighttime(float_t dbspl_val);
+
+/**
+ * @brief Gestisce la frequenza dei trigger per evitare sovraccarichi in ambienti rumorosi (Cooldown).
+ * @return 1 se l'evento deve essere elaborato, 0 se siamo in regime di protezione energetica.
+ */
+uint8_t Mic_ApplyCooldownProtection(void);
+
+#endif /* MIC_IMP34DT05_H */

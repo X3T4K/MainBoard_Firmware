@@ -474,9 +474,9 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 					pagina_scritta = 0;
 				}
 				// Set up session boundary pointers
-				session_start_block = b;
-				session_start_page = pagina_scritta;
-				session_active = 0;
+				session_start_block = a_scritta;
+				session_active = 0;b;
+				session_start_page = pagin
 				global_sample_count = 0;
 
 				current_state = STATE_ACQUISITION;
@@ -595,11 +595,30 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
           if (current_peak > global_max_peak)
           {
               global_max_peak = current_peak;
-              printf(">>> NUOVO PICCO RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
+              printf(">>> NUOVO PICCO GLOBALE RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
+          }
+
+          // All'inizio della callback del picco, verifichi il cooldown energetico
+          if (Mic_ApplyCooldownProtection() == 0) 
+          {
+            return; // Salta l'elaborazione se siamo sommersi da troppi interrupt vicini
           }
 
           // Calcola anche i dB per riferimento
           current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
+
+          // 2. Controllo Orario e Smistamento alla funzione Diurna o Notturna
+          // timestamp_peak contiene l'ora estratta dall'RTC al momento del trigger dell'OLD
+          if (timestamp_peak.hh >= 7 && timestamp_peak.hh < 23)
+          {
+              // Fascia oraria diurna (07:00 - 22:59)
+              Mic_AnalyzePeak_Daytime(current_peak_dbspl);
+          }
+          else
+          {
+              // Fascia oraria notturna (23:00 - 06:59)
+              Mic_AnalyzePeak_Nighttime(current_peak_dbspl);
+          }
 
         } else if (acquisition_active) {
 
