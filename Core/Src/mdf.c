@@ -29,6 +29,8 @@ MDF_FilterConfigTypeDef MdfFilterConfig0;
 MDF_HandleTypeDef MdfHandle1;
 MDF_FilterConfigTypeDef MdfFilterConfig1;
 MDF_OldConfigTypeDef mdfOldConfig1;
+MDF_HandleTypeDef MdfHandle2;
+MDF_FilterConfigTypeDef MdfFilterConfig2;
 DMA_HandleTypeDef handle_GPDMA1_Channel0;
 
 /* MDF1 init function */
@@ -51,10 +53,8 @@ void MX_MDF1_Init(void)
   MdfHandle0.Init.CommonParam.ProcClockDivider = 1;
   MdfHandle0.Init.CommonParam.OutputClock.Activation = ENABLE;
   MdfHandle0.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
-  MdfHandle0.Init.CommonParam.OutputClock.Divider = 5;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
-  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
+  MdfHandle0.Init.CommonParam.OutputClock.Divider = 6;
+  MdfHandle0.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
   MdfHandle0.Init.SerialInterface.Activation = ENABLE;
   MdfHandle0.Init.SerialInterface.Mode = MDF_SITF_NORMAL_SPI_MODE;
   MdfHandle0.Init.SerialInterface.ClockSource = MDF_SITF_CCK0_SOURCE;
@@ -84,10 +84,10 @@ void MX_MDF1_Init(void)
   MdfFilterConfig0.Integrator.Value = 2;
   MdfFilterConfig0.Integrator.OutputDivision = MDF_INTEGRATOR_OUTPUT_DIV_128;
   MdfFilterConfig0.SoundActivity.Activation = DISABLE;
-  MdfFilterConfig0.AcquisitionMode = MDF_MODE_SYNC_CONT;
+  MdfFilterConfig0.AcquisitionMode = MDF_MODE_SYNC_SINGLE;
   MdfFilterConfig0.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
   MdfFilterConfig0.DiscardSamples = 255;
-  MdfFilterConfig0.Trigger.Source = MDF_CLOCK_TRIG_TRGO;
+  MdfFilterConfig0.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
   MdfFilterConfig0.Trigger.Edge = MDF_FILTER_TRIG_RISING_EDGE;
 
   /**
@@ -98,10 +98,8 @@ void MX_MDF1_Init(void)
   MdfHandle1.Init.CommonParam.ProcClockDivider = 1;
   MdfHandle1.Init.CommonParam.OutputClock.Activation = ENABLE;
   MdfHandle1.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
-  MdfHandle1.Init.CommonParam.OutputClock.Divider = 5;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = ENABLE;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Source = MDF_CLOCK_TRIG_TIM1_TRGO;
-  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Edge = MDF_CLOCK_TRIG_RISING_EDGE;
+  MdfHandle1.Init.CommonParam.OutputClock.Divider = 6;
+  MdfHandle1.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
   MdfHandle1.Init.SerialInterface.Activation = DISABLE;
   if (HAL_MDF_Init(&MdfHandle1) != HAL_OK)
   {
@@ -133,6 +131,49 @@ void MX_MDF1_Init(void)
   mdfOldConfig1.LowThreshold = -3355443;
   mdfOldConfig1.OldEventConfig = MDF_OLD_SIGNAL_OUTSIDE_THRESHOLDS;
   mdfOldConfig1.BreakSignal = MDF_NO_BREAK_SIGNAL;
+
+  /**
+    MdfHandle2 structure initialization and HAL_MDF_Init function call
+  */
+  MdfHandle2.Instance = MDF1_Filter2;
+  MdfHandle2.Init.CommonParam.InterleavedFilters = 0;
+  MdfHandle2.Init.CommonParam.ProcClockDivider = 1;
+  MdfHandle2.Init.CommonParam.OutputClock.Activation = ENABLE;
+  MdfHandle2.Init.CommonParam.OutputClock.Pins = MDF_OUTPUT_CLOCK_0;
+  MdfHandle2.Init.CommonParam.OutputClock.Divider = 6;
+  MdfHandle2.Init.CommonParam.OutputClock.Trigger.Activation = DISABLE;
+  MdfHandle2.Init.SerialInterface.Activation = ENABLE;
+  MdfHandle2.Init.SerialInterface.Mode = MDF_SITF_NORMAL_SPI_MODE;
+  MdfHandle2.Init.SerialInterface.ClockSource = MDF_SITF_CCK0_SOURCE;
+  MdfHandle2.Init.SerialInterface.Threshold = 31;
+  MdfHandle2.Init.FilterBistream = MDF_BITSTREAM0_RISING;
+  if (HAL_MDF_Init(&MdfHandle2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /**
+    MdfFilterConfig2, MdfOldConfig2 and/or MdfScdConfig2 structures initialization
+
+    WARNING : only structures are filled, no specific init function call for filter
+  */
+  MdfFilterConfig2.DataSource = MDF_DATA_SOURCE_BSMX;
+  MdfFilterConfig2.Delay = 0;
+  MdfFilterConfig2.CicMode = MDF_ONE_FILTER_SINC5;
+  MdfFilterConfig2.DecimationRatio = 16;
+  MdfFilterConfig2.Offset = 0;
+  MdfFilterConfig2.Gain = 0;
+  MdfFilterConfig2.ReshapeFilter.Activation = ENABLE;
+  MdfFilterConfig2.ReshapeFilter.DecimationRatio = MDF_RSF_DECIMATION_RATIO_4;
+  MdfFilterConfig2.HighPassFilter.Activation = ENABLE;
+  MdfFilterConfig2.HighPassFilter.CutOffFrequency = MDF_HPF_CUTOFF_0_000625FPCM;
+  MdfFilterConfig2.Integrator.Activation = ENABLE;
+  MdfFilterConfig2.Integrator.Value = 2;
+  MdfFilterConfig2.Integrator.OutputDivision = MDF_INTEGRATOR_OUTPUT_DIV_128;
+  MdfFilterConfig2.SoundActivity.Activation = DISABLE;
+  MdfFilterConfig2.AcquisitionMode = MDF_MODE_ASYNC_SINGLE;
+  MdfFilterConfig2.FifoThreshold = MDF_FIFO_THRESHOLD_NOT_EMPTY;
+  MdfFilterConfig2.DiscardSamples = 255;
   /* USER CODE BEGIN MDF1_Init 2 */
 
   /* USER CODE END MDF1_Init 2 */
@@ -174,12 +215,20 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     __HAL_RCC_GPIOB_CLK_ENABLE();
     /**MDF1 GPIO Configuration
     PB1     ------> MDF1_SDI0
+    PB14     ------> MDF1_SDI2
     PB8     ------> MDF1_CCK0
     */
     GPIO_InitStruct.Pin = GPIO_PIN_1;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF6_MDF1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_14;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF6_MDF1;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
@@ -245,9 +294,10 @@ void HAL_MDF_MspDeInit(MDF_HandleTypeDef* mdfHandle)
 
     /**MDF1 GPIO Configuration
     PB1     ------> MDF1_SDI0
+    PB14     ------> MDF1_SDI2
     PB8     ------> MDF1_CCK0
     */
-    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_1|GPIO_PIN_8);
+    HAL_GPIO_DeInit(GPIOB, GPIO_PIN_1|GPIO_PIN_14|GPIO_PIN_8);
 
     /* MDF1 DMA DeInit */
     HAL_DMA_DeInit(mdfHandle->hdma);

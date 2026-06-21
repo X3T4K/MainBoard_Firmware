@@ -42,6 +42,10 @@ extern MDF_FilterConfigTypeDef MdfFilterConfig1;
 
 extern MDF_OldConfigTypeDef mdfOldConfig1;
 
+extern MDF_HandleTypeDef MdfHandle2;
+
+extern MDF_FilterConfigTypeDef MdfFilterConfig2;
+
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

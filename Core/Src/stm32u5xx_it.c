@@ -59,6 +59,7 @@
 extern DMA_HandleTypeDef handle_GPDMA1_Channel0;
 extern MDF_HandleTypeDef MdfHandle0;
 extern MDF_HandleTypeDef MdfHandle1;
+extern MDF_HandleTypeDef MdfHandle2;
 extern SPI_HandleTypeDef hspi2;
 extern SPI_HandleTypeDef hspi3;
 extern TIM_HandleTypeDef htim1;

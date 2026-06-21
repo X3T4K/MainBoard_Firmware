@@ -121,8 +121,6 @@ Time_Struct timestamp_peak;
 uint16_t tim = 0;
 
 // Sound Acquisition variables //
-static bool peak_detected = false;
-static bool acquisition_active = false;
 static float current_peak_dbspl = 0.0f;
 static float current_acquisition_dbspl = 0.0f;
 /* USER CODE END PV */
@@ -246,7 +244,7 @@ int main(void)
   printf("\r\n--- Test Microfono Digital IMP34DT05 ---\r\n");
   printf("System: Avvio monitoraggio soglia acustica...\r\n");
   HAL_Delay(50);
-  Mic_Start();
+  start_peak_detection(); // Avvia il monitoraggio della soglia acustica
   HAL_Delay(100);
   printf("MDF1 Base: GCR=0x%08X, CKGCR=0x%08X\r\n", (unsigned int)MDF1->GCR, (unsigned int)MDF1->CKGCR);
   printf("RCC Regs: CR=0x%08X, PLL3CFGR=0x%08X, PLL3DIVR=0x%08X, CCIPR2=0x%08X\r\n",
@@ -381,46 +379,6 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-/**
-  * @brief  Callback function for the timer period elapsed event.
-  * This function is triggered by a hardware timer at a fixed interval.
-  * @param  htim: Pointer to the timer handle.
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-  if(htim == &htim2){
-    
-    // Read raw data from microphone
-    if (MdfHandle0.State == HAL_MDF_STATE_READY)
-    {
-      acquisition_active = true;
-
-      // 1. Accendi il LED di allerta
-      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
-
-      printf("Inizio Monitoraggio Sonoro periodico! Avvio cattura DMA...\r\n");
-      
-      // 2. Fai partire una cattura rapida di campioni col Filtro 0 e salva in timestamp 
-      MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
-      mdfDmaConfig0.Address    = (uint32_t)&audio_buffer_acq[0];
-      mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_acq[0]);
-      mdfDmaConfig0.MsbOnly    = DISABLE;
-
-      if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
-      {
-          Error_Handler();
-          acquisition_active = false; //Reset del flag in caso di errore
-      }
-      
-      RTC_TimeTypeDef sTime = {0};
-      RTC_DateTypeDef sDate = {0};
-      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
-      timestamp_monitoring = {.hh = sTime.Hours, .mm = sTime.Minutes, .ss = sTime.Seconds};
-    }
-  }
-}
-
-
 
 /**
   * @brief  Callback function for external interrupt events (e.g., a button press).
@@ -450,14 +408,14 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 
 				current_state = STATE_ACQUISITION;
         printf("Starting data acquisition...\n");
-				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic data reading
+				start_continuous_acquisition(); // Start continuous acquisition for periodic monitoring
 				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
 			break;
 			case STATE_ACQUISITION:
 				// If data acquisition is active, stop it.
         button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
 				current_state = STATE_IDLE;
-				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
+				stop_continuous_acquisition(); // Stop the continuous acquisition
 
 				LED_Off(LED_GREEN); // Turn off the LED
         printf("Data acquisition stopped by user.\n");
@@ -481,34 +439,31 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 
 	}
 }
-int32_t global_max_peak = 0;
+static float global_max_peak = 0;
 
-// Callback per il rilevamento di eventi di stress acustico (SCD)
+// Callback per il rilevamento di eventi di stress acustico (OLD)
 void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
 {
     //printf("MDF Callback: Soglia acustica superata! TresholdInfo: 0x%08lX\r\n", TresholdInfo);
     if (hmdf->Instance == MDF1_Filter1)
     {
         // Se c'è già una cattura in corso su Filtro 0, non facciamo nulla
-        if (MdfHandle0.State == HAL_MDF_STATE_READY)
+        if (MdfHandle2.State == HAL_MDF_STATE_READY)
         {
-
-          peak_detected = true;
 
           // 1. Accendi il LED di allerta
           HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_SET);
           
           printf("MDF Callback: Superata soglia acustica! Avvio cattura DMA...\r\n");
           
-          // 2. Fai partire una cattura rapida di campioni col Filtro 0  
-          MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
-          mdfDmaConfig0.Address    = (uint32_t)&audio_buffer_peak[0];
-          mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_peak[0]);
-          mdfDmaConfig0.MsbOnly    = DISABLE;
-          if (HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0) != HAL_OK)
+          // 2. Fai partire una cattura rapida di campioni col Filtro 2
+          MDF_DmaConfigTypeDef mdfDmaConfig2 = {0};
+          mdfDmaConfig2.Address    = (uint32_t)&audio_buffer_peak[0];
+          mdfDmaConfig2.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_peak[0]);
+          mdfDmaConfig2.MsbOnly    = DISABLE;
+          if (HAL_MDF_AcqStart_DMA(&MdfHandle2, &MdfFilterConfig2, &mdfDmaConfig2) != HAL_OK)
           {
               Error_Handler();
-              peak_detected = false; // Reset del flag in caso di errore
           }
 
           // Salva il timestamp del rilevamento del picco
@@ -524,60 +479,55 @@ void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
 // Quando il buffer è pieno, calcoliamo i dB
 void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
 {
-    if (hmdf->Instance == MDF1_Filter0)
+  if (hmdf->Instance == MDF1_Filter2)
+  {
+    // Se questa callback è stata chiamata da una cattura rapida in seguito al rilevamento di un picco,
+    //  calcoliamo i dB e poi spegniamo il LED di allerta
+
+    printf("MDF Callback: Cattura DMA completata dopo rilevamento picco! Calcolo dB...\r\n");
+
+      // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
+    HAL_MDF_AcqStop(&MdfHandle2);
+
+    // Spegni il LED di allerta
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+
+    // Calcola i dB per il picco rilevato
+    current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
+    
+    // Se il picco corrente supera il massimo registrato, lo stampiamo
+    if (current_peak_dbspl > global_max_peak)
     {
-        if(peak_detected) {
-          // Se questa callback è stata chiamata da una cattura rapida in seguito al rilevamento di un picco,
-          //  calcoliamo i dB e poi spegniamo il LED di allerta
-
-          printf("MDF Callback: Cattura DMA completata dopo rilevamento picco! Calcolo dB...\r\n");
-          peak_detected = false; // Reset del flag
-
-            // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
-          HAL_MDF_AcqStop(&MdfHandle0);
-
-          // Spegni il LED di allerta
-          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-
-          // Calcola il valore di picco assoluto nel buffer corrente (valori a 24-bit allineati)
-          int32_t current_peak = 0;
-          for (int i = 0; i < AUDIO_SAMPLES; i++)
-          {
-              int32_t val = audio_buffer_peak[i] >> 8;
-              if (val < 0) val = -val;
-              if (val > current_peak) current_peak = val;
-          }
-
-          // Se il picco corrente supera il massimo registrato, lo stampiamo
-          if (current_peak > global_max_peak)
-          {
-              global_max_peak = current_peak;
-              printf(">>> NUOVO PICCO RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
-          }
-
-          // Calcola anche i dB per riferimento
-          current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
-
-        } else if (acquisition_active) {
-
-          printf("MDF Callback: Cattura DMA completata durante acquisizione periodica! Calcolo dB...\r\n");
-          acquisition_active = false; // Reset del flag
-
-            // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
-          HAL_MDF_AcqStop(&MdfHandle0);
-
-          // Spegni il LED di allerta
-          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-
-          // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
-          current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
-
-          write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
-          sample++;
-
-        }
-        write_memory(); // Salva su NAND Flash
+        global_max_peak = current_peak_dbspl;
+        printf(">>> NUOVO PICCO RILEVATO (valore di soglia): %.2fdBSPL <<<\r\n", global_max_peak);
     }
+
+    // Calcola anche i dB per riferimento
+
+
+    } else if (hmdf->Instance == MDF1_Filter0) {
+      
+      // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
+
+      printf("MDF Callback: Cattura DMA completata durante acquisizione periodica! Calcolo dB...\r\n");
+
+        // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
+      HAL_MDF_AcqStop(&MdfHandle0);
+
+      // Spegni il LED di allerta
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
+
+      // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
+      current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
+
+      write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
+      sample++;
+
+      write_memory(); // Salva su NAND Flash
+    }
+        
+    
+    
 }
 
 /* USER CODE END 4 */

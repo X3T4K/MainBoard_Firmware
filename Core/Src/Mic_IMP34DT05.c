@@ -17,33 +17,11 @@ float_t dbfs_value;
 float_t dbspl_value;
 
 /**
- * @brief Start microphone acquisition trigger and threshold detection
+ * @brief Start microphone peak detection
  */
-void Mic_Start(void)
+void start_peak_detection(void)
 {
-    // Avvia il timer TIM1 che genera il clock per il microfono PDM (CCK0)
-    if (HAL_TIM_Base_Start(&htim1) != HAL_OK)
-    {
-        printf("ERROR: TIM1 start failed!\r\n");
-        Error_Handler();
-    }
-    else
-    {
-        printf("DEBUG: TIM1 started successfully.\r\n");
-    }
-    
-    // Configura e avvia il Canale Filtro 1 in modalità polling (necessario per abilitare DFLTEN e applicare MdfFilterConfig1)
-    HAL_StatusTypeDef status = HAL_MDF_AcqStart(&MdfHandle1, &MdfFilterConfig1);
-    if (status != HAL_OK)
-    {
-        printf("ERROR: MDF AcqStart (Filter 1) failed! Status: %d\r\n", status);
-        Error_Handler();
-    }
-    else
-    {
-        printf("DEBUG: MDF AcqStart (Filter 1) active.\r\n");
-    }
-    
+   
     // Avvia il monitoraggio della soglia (Over-Limit Detector) sul Filtro 1 in modalità interrupt
     status = HAL_MDF_OldStart_IT(&MdfHandle1, &mdfOldConfig1);
     if (status != HAL_OK)
@@ -57,19 +35,20 @@ void Mic_Start(void)
     }
 }
 
-/**
- * @brief Stop microphone acquisition trigger and threshold detection
- */
-void Mic_Stop(void)
+void stop_peak_detection(void)
 {
-    // Ferma il monitoraggio della soglia
-    HAL_MDF_OldStop_IT(&MdfHandle1);
-    
-    // Ferma l'acquisizione sul Canale Filtro 1
-    HAL_MDF_AcqStop(&MdfHandle1);
-    
-    // Ferma il timer TIM1
-    HAL_TIM_Base_Stop(&htim1);
+   
+    // Ferma il monitoraggio della soglia (Over-Limit Detector) sul Filtro 1 in modalità interrupt
+    status = HAL_MDF_OldStop_IT(&MdfHandle1, &mdfOldConfig1);
+    if (status != HAL_OK)
+    {
+        printf("ERROR: MDF OldStop_IT failed! Status: %d\r\n", status);
+        Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: MDF OldStop_IT stopped successfully.\r\n");
+    }
 }
 
 
@@ -113,3 +92,57 @@ float Calculate_dB(int32_t *buffer, uint16_t size)
     return dbspl_value;
 }
 
+/**
+ * @brief Start continuous acquisition for periodic monitoring
+ * @note This function configures the MDF Filter 0 for continuous acquisition.
+ */
+void start_continuous_acquisition(void){
+
+
+    HAL_StatusTypeDef status = HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0);
+    if (status != HAL_OK)
+    {
+        printf("ERROR: MDF AcqStart (Filter 0) failed! Status: %d\r\n", status);
+        Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: MDF AcqStart (Filter 0) active for continuous acquisition.\r\n");
+    }
+
+    if(HAL_TIM_Base_Start(&htim1) != HAL_OK)
+    {
+        printf("ERROR: TIM1 start failed!\r\n");
+        Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: TIM1 started successfully for periodic acquisition.\r\n");
+    }
+}
+
+void stop_continuous_acquisition(void){
+
+    // Stop the DMA acquisition on Filter 0
+    HAL_StatusTypeDef status = HAL_MDF_AcqStop(&MdfHandle0);
+    if (status != HAL_OK)
+    {
+        printf("ERROR: MDF AcqStop (Filter 0) failed! Status: %d\r\n", status);
+        Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: MDF AcqStop (Filter 0) stopped successfully.\r\n");
+    }
+
+    // Stop the timer TIM1
+    if(HAL_TIM_Base_Stop(&htim1) != HAL_OK)
+    {
+        printf("ERROR: TIM1 stop failed!\r\n");
+        Error_Handler();
+    }
+    else
+    {
+        printf("DEBUG: TIM1 stopped successfully for periodic acquisition.\r\n");
+    }
+}

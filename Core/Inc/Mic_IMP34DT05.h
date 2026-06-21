@@ -16,8 +16,11 @@ extern float_t dbspl_value;
 
 /* Prototipi delle funzioni */
 
-void Mic_Start(void);
-void Mic_Stop(void);
+void start_peak_detection(void);
+void stop_peak_detection(void);
 
 float Calculate_dB(int32_t *buffer, uint16_t size); 
+
+void start_continuous_acquisition(void);
+void stop_continuous_acquisition(void);
 
