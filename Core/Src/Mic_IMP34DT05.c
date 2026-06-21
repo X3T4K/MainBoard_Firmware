@@ -143,6 +143,8 @@ void stop_continuous_acquisition(void){
     {
         printf("DEBUG: TIM1 stopped successfully for periodic acquisition.\r\n");
     }
+   }
+
  * @brief Stampa la diagnostica dei picchi acustici per la fascia DIURNA.
  * Soglia minima di attenzione: 65 dBSPL (Traffico/Folla).
  */

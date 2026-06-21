@@ -460,6 +460,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 		}
   }
 }
+
 // Falling Edge when User Button is not pressed
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 {
@@ -468,7 +469,6 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 
 	}
 }
-static float global_max_peak = 0;
 
 // Callback per il rilevamento di eventi di stress acustico (OLD)
 void HAL_MDF_OldCallback(MDF_HandleTypeDef *hmdf, uint32_t TresholdInfo)
@@ -516,7 +516,7 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
 
     printf("MDF Callback: Cattura DMA completata dopo rilevamento picco! Calcolo dB...\r\n");
 
-      // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
+    // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
     HAL_MDF_AcqStop(&MdfHandle2);
 
     // Spegni il LED di allerta
@@ -524,93 +524,27 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
 
     // Calcola i dB per il picco rilevato
     current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
-    
-    // Se il picco corrente supera il massimo registrato, lo stampiamo
-    if (current_peak_dbspl > global_max_peak)
+
+    // All'inizio della callback del picco, verifichi il cooldown energetico
+    if (Mic_ApplyCooldownProtection() == 0) 
     {
-        if(peak_detected) {
-          // Se questa callback è stata chiamata da una cattura rapida in seguito al rilevamento di un picco,
-          //  calcoliamo i dB e poi spegniamo il LED di allerta
-
-          printf("MDF Callback: Cattura DMA completata dopo rilevamento picco! Calcolo dB...\r\n");
-          peak_detected = false; // Reset del flag
-
-            // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
-          HAL_MDF_AcqStop(&MdfHandle0);
-
-          // Spegni il LED di allerta
-          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-
-          // All'inizio della callback del picco, verifichi il cooldown energetico
-          if (Mic_ApplyCooldownProtection() == 0) 
-          {
-            return; // Salta l'elaborazione se siamo sommersi da troppi interrupt vicini
-          }
-
-          // Calcola il valore di picco assoluto nel buffer corrente (valori a 24-bit allineati)
-          int32_t current_peak = 0;
-          for (int i = 0; i < AUDIO_SAMPLES; i++)
-          {
-              int32_t val = audio_buffer_peak[i] >> 8;
-              if (val < 0) val = -val;
-              if (val > current_peak) current_peak = val;
-          }
-
-          // Se il picco corrente supera il massimo registrato, lo stampiamo
-          if (current_peak > global_max_peak)
-          {
-              global_max_peak = current_peak;
-              printf(">>> NUOVO PICCO GLOBALE RILEVATO (valore di soglia): %ld <<<\r\n", (long)global_max_peak);
-          }
-
-          // Calcola anche i dB per riferimento
-          current_peak_dbspl = Calculate_dB(audio_buffer_peak, AUDIO_SAMPLES);
-
-          // 2. Controllo Orario e Smistamento alla funzione Diurna o Notturna
-          // timestamp_peak contiene l'ora estratta dall'RTC al momento del trigger dell'OLD
-          if (timestamp_peak.hh >= 7 && timestamp_peak.hh < 23)
-          {
-              // Fascia oraria diurna (07:00 - 22:59)
-              Mic_AnalyzePeak_Daytime(current_peak_dbspl);
-          }
-          else
-          {
-              // Fascia oraria notturna (23:00 - 06:59)
-              Mic_AnalyzePeak_Nighttime(current_peak_dbspl);
-          }
-
-        } else if (acquisition_active) {
-
-          printf("MDF Callback: Cattura DMA completata durante acquisizione periodica! Calcolo dB...\r\n");
-          acquisition_active = false; // Reset del flag
-
-            // Ferma l'acquisizione su Filtro 0 per reimpostare lo stato a READY per il prossimo trigger
-          HAL_MDF_AcqStop(&MdfHandle0);
-
-          // Spegni il LED di allerta
-          HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
-
-          // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
-          printf("[DEBUG] Primi campioni acquisiti: [0]=%ld, [1]=%ld, [2]=%ld\r\n", 
-                 (long)audio_buffer_acq[0], 
-                 (long)audio_buffer_acq[1], 
-                 (long)audio_buffer_acq[2]);
-          current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
-          printf("[Acquisition] Campione salvato: %02d:%02d:%02d -> %.2f dBSPL (Totale: %d)\r\n",
-                 timestamp_monitoring.hh, timestamp_monitoring.mm, timestamp_monitoring.ss,
-                 current_acquisition_dbspl, sample);
-
-          write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
-          sample++;
-
-        }
-        write_memory(); // Salva su NAND Flash
+      return; // Salta l'elaborazione se siamo sommersi da troppi interrupt vicini
     }
 
-    // Calcola anche i dB per riferimento
+    // 2. Controllo Orario e Smistamento alla funzione Diurna o Notturna
+    // timestamp_peak contiene l'ora estratta dall'RTC al momento del trigger dell'OLD
+    if (timestamp_peak.hh >= 7 && timestamp_peak.hh < 23)
+    {
+        // Fascia oraria diurna (07:00 - 22:59)
+        Mic_AnalyzePeak_Daytime(current_peak_dbspl);
+    }
+    else
+    {
+        // Fascia oraria notturna (23:00 - 06:59)
+        Mic_AnalyzePeak_Nighttime(current_peak_dbspl);
+    }
 
-
-    } else if (hmdf->Instance == MDF1_Filter0) {
+  } else if (hmdf->Instance == MDF1_Filter0) {
       
       // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
 
@@ -623,16 +557,22 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
       HAL_GPIO_WritePin(GPIOB, GPIO_PIN_7, GPIO_PIN_RESET);
 
       // Se questa callback è stata chiamata da una cattura periodica, calcoliamo i dB per riferimento
-      current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
+      printf("[DEBUG] Primi campioni acquisiti: [0]=%ld, [1]=%ld, [2]=%ld\r\n", 
+            (long)audio_buffer_acq[0], 
+            (long)audio_buffer_acq[1], 
+            (long)audio_buffer_acq[2]);
 
+      current_acquisition_dbspl = Calculate_dB(audio_buffer_acq, AUDIO_SAMPLES);
+      
+      printf("[Acquisition] Campione salvato: %02d:%02d:%02d -> %.2f dBSPL (Totale: %d)\r\n",
+            timestamp_monitoring.hh, timestamp_monitoring.mm, timestamp_monitoring.ss,
+            current_acquisition_dbspl, sample);
       write_packet(sample, timestamp_monitoring, current_acquisition_dbspl, NAND_packet); // Salva su NAND Flash
       sample++;
+    
 
       write_memory(); // Salva su NAND Flash
-    }
-        
-    
-    
+    }    
 }
 
 /* USER CODE END 4 */

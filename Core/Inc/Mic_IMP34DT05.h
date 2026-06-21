@@ -16,6 +16,8 @@ extern int32_t audio_buffer_acq[AUDIO_SAMPLES];
 extern float_t rms_value;
 extern float_t dbfs_value;
 extern float_t dbspl_value;
+extern uint32_t last_peak_time = 0;
+extern uint8_t heavy_noise_zone_flag = 0;
 
 /* Prototipi delle funzioni */
 
