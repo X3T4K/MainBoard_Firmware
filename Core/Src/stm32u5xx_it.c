@@ -449,6 +449,20 @@ void MDF1_FLT1_IRQHandler(void)
   /* USER CODE END MDF1_FLT1_IRQn 1 */
 }
 
+/**
+  * @brief This function handles MDF1 Filter 2 global interrupt.
+  */
+void MDF1_FLT2_IRQHandler(void)
+{
+  /* USER CODE BEGIN MDF1_FLT2_IRQn 0 */
+
+  /* USER CODE END MDF1_FLT2_IRQn 0 */
+  HAL_MDF_IRQHandler(&MdfHandle2);
+  /* USER CODE BEGIN MDF1_FLT2_IRQn 1 */
+
+  /* USER CODE END MDF1_FLT2_IRQn 1 */
+}
+
 /* USER CODE BEGIN 1 */
 
 /* USER CODE END 1 */
