@@ -47,6 +47,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/bluetooth.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/imu_driver.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/led_driver.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/callback_LPDMA.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/Memory_operations.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/SPI_NAND.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/Spec_AS7341.c

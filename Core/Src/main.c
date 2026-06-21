@@ -73,15 +73,28 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-I2C_HandleTypeDef hi2c3;
-DMA_HandleTypeDef handle_LPDMA1_Channel0;
-LPTIM_HandleTypeDef hlptim1;
 /* USER CODE BEGIN PV */
 
 /// @brief 
 
 data_packet pacchetto;
 Time_Struct time_date;
+
+// --- BUFFER DI EMERGENZA DEMO ---
+#define DEMO_BUFFER_SIZE 120 // 2 minuti a 1 Hz
+
+typedef struct {
+    uint16_t ch0;
+    uint16_t ch1;
+    uint16_t ch2;
+    uint16_t ch3;
+    uint16_t ch4;
+    Time_Struct timestamp; // <-- Salviamo l'orario di ogni singolo scatto
+} DemoSample;
+
+__attribute__((section(".sram4_retention"))) DemoSample demo_buffer[DEMO_BUFFER_SIZE];
+__attribute__((section(".sram4_retention"))) uint16_t demo_index = 0;
+
 
 //uint8_t AS7341_start_register = 0x95; //inizio a leggere da CH0
 __attribute__((section(".sram4_retention"))) uint8_t AS7341_start_register[1]; //inizio a leggere da STATUS, mi serve ASTATUS per avere il gain
@@ -125,6 +138,7 @@ __attribute__((section(".sram4_retention"))) uint8_t session_active;
 // Set to 1 when a USB connection is detected.
 uint8_t usb_flag = 0;
 
+
 /// ----- NAND FLASH variables ----- ///
 
 read_address_t blocco;
@@ -153,6 +167,8 @@ void HAL_DMA_RxCpltCallback(DMA_HandleTypeDef *hdma) {
 	}
 }
 
+
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -166,6 +182,40 @@ int _write(int file, char *ptr, int len) {
         ITM_SendChar(*ptr++);
     }
     return len;
+}
+
+void Emergency_Dump_To_NAND(void) {
+    printf("[DEMO] Inizio dump del buffer in NAND. Campioni da salvare: %d\n", demo_index);
+    
+    nand_offset = 0;
+    memset((void*)NAND_packet, 0, sizeof(NAND_packet));
+
+    data_packet dp = {0};
+
+    for(uint16_t i = 0; i < demo_index; i++) {
+        
+        dp.deep_blue = demo_buffer[i].ch0;
+        dp.blue      = demo_buffer[i].ch1;
+        dp.clear     = demo_buffer[i].ch4;
+        dp.luce_artificiale = 0; 
+
+        // Passiamo il timestamp reale che avevamo congelato nel buffer
+        write_packet(nand_offset, demo_buffer[i].timestamp, dp, NAND_packet, 1, demo_buffer[i].timestamp.ss, 0);
+        nand_offset += 7; 
+
+        if (nand_offset > 2041) { 
+            write_memory();
+            nand_offset = 0;
+            memset((void*)NAND_packet, 0, sizeof(NAND_packet));
+        }
+    }
+
+    if (nand_offset > 0) {
+        write_memory();
+    }
+
+    printf("[DEMO] Dump completato!\n");
+    demo_index = 0; 
 }
 
 /* USER CODE END 0 */
@@ -291,6 +341,7 @@ int main(void)
   MX_I2C_Spec_I2C_RX_Link(&handle_LPDMA1_Channel0);       // Collega la coda al canale DMA
   MX_I2C_Spec_I2C_RX_Start(&handle_LPDMA1_Channel0); 
   
+
   
 
   printf("[BOOT] Initialization completed successfully. Entering main loop...\n");
@@ -302,7 +353,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    // vai in Stop 2 SOLO se non stai lavorando (USB o download)
+    /* vai in Stop 2 SOLO se non stai lavorando (USB o download) 
     if (current_state == STATE_ACQUISITION) 
     {   
         HAL_DBGMCU_EnableDBGStopMode(); // Keep debug active in Stop mode for ITM/SWO printf
@@ -320,11 +371,12 @@ int main(void)
             
             // Il PLL si spegne in Stop 2. Ripristiniamo il clock al risveglio!
             SystemClock_Config(); 
-            /* Enable HSI in Stop mode (HSIKERON) so LPBAM can autonomously request it during Stop 2 sleep! */
+            /* Enable HSI in Stop mode (HSIKERON) so LPBAM can autonomously request it during Stop 2 sleep! 
             __HAL_RCC_HSISTOP_ENABLE();
             HAL_ResumeTick(); // Ripristiniamo il Systick
         }
-    }  
+    }*/
+    
     
     /* USER CODE END WHILE */
 
@@ -339,38 +391,12 @@ int main(void)
 	  		// Check if a USB connection has been detected
 	  		if(!usb_flag)
 		    {
-	  			if(button_force_stop==1) // se non sono connesso via USB, ma premo il bottone, entro in acquisition mode
+	  			if(button_force_stop==1)
           {
-            // 1. Leggiamo i byte RIMANENTI nel blocco LPDMA corrente dal registro CBR1
-            uint32_t bytes_remaining = handle_LPDMA1_Channel0.Instance->CBR1;
-
-            // 2. Definiamo la dimensione teorica del blocco del canale DMA (es. la dimensione del buffer)
-            uint32_t total_block_size = sizeof(AS7341_Rx_Buffer);
-
-            // 3. Calcoliamo i byte EFFETTIVAMENTE trasferiti per differenza
-            uint32_t bytes_transferred = 0;
-            if (bytes_remaining <= total_block_size) {
-                bytes_transferred = total_block_size - bytes_remaining;
-            }
-
-            // 4. Calcoliamo quanti campioni sani da 12 byte abbiamo
-            real_samples_numb = bytes_transferred / AS7341_COLOR_BPS;
-            
-            printf("[DEBUG] Stop Button: Samples=%d\n", (int)real_samples_numb);
-
-            if (real_samples_numb > 5) {
-                real_samples_numb = 5; // Limita al massimo a 5 campioni per sicurezza
-            }
-
-            // 5. Elabora i dati acquisiti fino a quel momento (real_samples_numb) e salva in memoria
-            if (real_samples_numb > 0) {
-                Elabora_e_Salva_Campionamento(); 
-            }
-
-            // FORCE WRITE THE LAST PARTIAL PAGE TO NAND TO PREVENT DATA LOSS
-            flush_nand_memory(nand_offset);
-
-            button_force_stop = 0; // Reset flag to prevent endless loop execution in STATE_IDLE
+              printf("[DEBUG] Stop Button Premuto: Salvo campioni parziali...\n");
+              Emergency_Dump_To_NAND(); // Salva quello che hai raccolto finora
+              button_force_stop = 0; 
+              Debug_Read_And_Print_NAND();
           }
         }
         //MX_USB_Device_Init();
@@ -384,38 +410,75 @@ int main(void)
 	  		break;
 
 	  	  case STATE_ACQUISITION:
-	  		   // All data acquisition is handled by the timer interrupt
-           // 2. Interrupt arrivato, 2 casi
-          if (lpbam_cycle_complete) {
-              // Caso 1: Il ciclo LPBAM è completo, salvo i dati
-              lpbam_cycle_complete = 0; // Resetta la bandierina
+          {
+              static uint8_t lpbam_reverted = 0;
+              if (!lpbam_reverted)
+              {
+                  printf("[MANUAL] Ripristino I2C3 standard...\n");
+                  MX_I2C_Spec_I2C_RX_Stop(&handle_LPDMA1_Channel0);
+                  MX_I2C_Spec_I2C_RX_DeInit();
+                  HAL_I2C_UnRegisterCallback(&hi2c3, HAL_I2C_MSPINIT_CB_ID);
+                  HAL_I2C_UnRegisterCallback(&hi2c3, HAL_I2C_MSPDEINIT_CB_ID);
+                  MX_I2C3_Init();
+                  lpbam_reverted = 1;
+                  demo_index = 0; // Assicurati che l'indice parta da zero
+              }
 
-              // Temporarily pause background LPTIM triggers to avoid I2C bus collision
               HAL_LPTIM_PWM_Stop(&hlptim1, LPTIM_CHANNEL_1);
+              // ... [codice di init manuale uguale] ...
+              
+              uint8_t raw_data[12] = {0};
+              HAL_StatusTypeDef ret = HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, raw_data, 12, 100);
+              
+              if (ret == HAL_OK) 
+              {
+                  uint16_t ch0 = ((uint16_t)raw_data[3]  << 8) | raw_data[2];
+                  uint16_t ch1 = ((uint16_t)raw_data[5]  << 8) | raw_data[4];
+                  uint16_t ch2 = ((uint16_t)raw_data[7]  << 8) | raw_data[6];
+                  uint16_t ch3 = ((uint16_t)raw_data[9]  << 8) | raw_data[8];
+                  uint16_t ch4 = ((uint16_t)raw_data[11] << 8) | raw_data[10];
 
-              real_samples_numb = NUM_SAMPLES_PER_WAKEUP; // so che sono 5 quando chiamo questa
-              Elabora_e_Salva_Campionamento(); // Elabora i dati acquisiti e salva in memoria
+                  // SALVATAGGIO NEL BUFFER (Se c'è spazio)
+                  if(demo_index < DEMO_BUFFER_SIZE) {
+                      RTC_TimeTypeDef sTime = {0};
+                      RTC_DateTypeDef sDate = {0};
 
-              //  Pulisce l'interrupt sul sensore AS7341
-              // Legge il registro STATUS (0x93) e lo riscrive per pulire il bit AINT
-              uint8_t status_reg = 0;
-              // Legge lo stato (e i flag degli interrupt attivi)
-              HAL_I2C_Mem_Read(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+                      // Leggi l'orario reale in questo esatto secondo
+                      HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+                      HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN); 
 
-              // Riscrive lo stesso valore. I bit a "1" verranno azzerati dal sensore
-              HAL_I2C_Mem_Write(&hi2c3, SPEC_I2C_ADDR, 0x93, I2C_MEMADD_SIZE_8BIT, &status_reg, 1, HAL_MAX_DELAY);
+                      demo_buffer[demo_index].ch0 = ch0;
+                      demo_buffer[demo_index].ch1 = ch1;
+                      demo_buffer[demo_index].ch2 = ch2;
+                      demo_buffer[demo_index].ch3 = ch3;
+                      demo_buffer[demo_index].ch4 = ch4;
+                      
+                      // Salva il timestamp
+                      demo_buffer[demo_index].timestamp.hh = sTime.Hours;
+                      demo_buffer[demo_index].timestamp.mm = sTime.Minutes;
+                      demo_buffer[demo_index].timestamp.ss = sTime.Seconds;
 
-              // Restart LPTIM triggers once manual I2C communication is complete
-              HAL_LPTIM_PWM_Start(&hlptim1, LPTIM_CHANNEL_1);
-          }else if (as7341_int_alarm){
-              // Caso 2: L'interrupt di soglia è arrivato, avverte subito via BLE
-              uint8_t AS7341_TRESHOLD[]={[0]=123, [1]=9, [2]=125}; 
-              BLE_SendData(AS7341_TRESHOLD, sizeof(AS7341_TRESHOLD));
-              printf("[BLE] Soglia superata\n");// invia la notifica attraverso BLE
-              as7341_int_alarm = 0; // Resetta la bandierina
+                      demo_index++;
+                      printf("[Acquisition] Acquisito %d/%d alle %02d:%02d:%02d\n", 
+                             demo_index, DEMO_BUFFER_SIZE, sTime.Hours, sTime.Minutes, sTime.Seconds);
+                  } 
+                  
+                  // CONTROLLO FINE BUFFER
+                  if (demo_index >= DEMO_BUFFER_SIZE) {
+                      printf("[Acquisition] Buffer pieno (2 minuti)! Eseguo dump in NAND...\n");
+                      Emergency_Dump_To_NAND();
+                      
+                      // Ferma l'acquisizione terminato il test per evitare di bloccare il sistema
+                      // o sovrascrivere. Riporta la macchina a stati in IDLE.
+                      current_state = STATE_IDLE; 
+                      LED_Off(LED_GREEN);
+                  }
+              }
+              
+              // FONDAMENTALE PER FORZARE IL CAMPIONAMENTO A 1 HZ
+              HAL_Delay(1000); 
           }
-
-			break;
+          break;
 
 	  	  case STATE_USB_CONNECTED:
 	  		break;
@@ -555,7 +618,8 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 		// A button press can trigger different state transitions depending on the current state.
 		switch(current_state) {
 			case STATE_IDLE:
-				// If the device is idle, start data acquisition.
+
+        // If the device is idle, start data acquisition.
 				// If the previous session wrote some data, circularly advance to the next good block
 				if (pagina_scritta > 0) {
 					b++;
@@ -581,7 +645,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
 
 				LED_Off(LED_GREEN); // Turn off the LED
-        printf("Data acquisition stopped by user.\n");
+        //printf("Data acquisition stopped by user.\n");
 				break;
 			case STATE_USB_CONNECTED:
 				// If USB is connected, start the download process.
@@ -608,7 +672,7 @@ void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 	else if (GPIO_Pin == SP_INT_Pin)
 	{
 		as7341_int_alarm = 1;
-		printf("[DEBUG] Spectrometer EXTI5 Interrupt Fired! (as7341_int_alarm=1)\n");
+		//printf("[DEBUG] Spectrometer EXTI5 Interrupt Fired! (as7341_int_alarm=1)\n");
 	}
 }
 

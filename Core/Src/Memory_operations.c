@@ -180,6 +180,13 @@ void Debug_Read_And_Print_NAND(void) {
                     break;
                 }
 
+                // Salta i campioni completamente a zero (non scritti)
+                if (hh == 0 && mm == 0 && ss == 0 &&
+                    artificial_light == 0 && blue == 0 &&
+                    deep_blue == 0 && clear == 0) {
+                    continue;
+                }
+
                 printf("  [%05lu] Ora: %02u:%02u:%02u | Luce Artif: %u | Blue: %u | DeepBlue: %u | Clear: %u\n",
                        (unsigned long)total_packets_printed, hh, mm, ss, artificial_light, blue, deep_blue, clear);
                 total_packets_printed++;
