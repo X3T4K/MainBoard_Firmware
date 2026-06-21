@@ -303,7 +303,7 @@ int main(void)
         case STATE_TRANSFER:
             // Invia i dati per il grafico
             //send_data_to_app();
-            printf("ready to transfer\n");
+            //printf("ready to transfer\n");
         break;
 
 	  }
@@ -428,7 +428,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 {
 	if(GPIO_Pin == USER_BUTTON_Pin)
 	{
-    printf("[MAIN] User button pressed. Writing test page...\n");
+    //printf("[MAIN] User button pressed. Writing test page...\n");
 		//Debug_Write_Test_Page();
     Debug_Read_And_Print_NAND();
 	}
