@@ -23,7 +23,7 @@ uint8_t heavy_noise_zone_flag = 0;
  */
 void start_peak_detection(void)
 {
-   
+    HAL_StatusTypeDef status;
     // Avvia il monitoraggio della soglia (Over-Limit Detector) sul Filtro 1 in modalità interrupt
     status = HAL_MDF_OldStart_IT(&MdfHandle1, &mdfOldConfig1);
     if (status != HAL_OK)
@@ -39,9 +39,9 @@ void start_peak_detection(void)
 
 void stop_peak_detection(void)
 {
-   
+    HAL_StatusTypeDef status;
     // Ferma il monitoraggio della soglia (Over-Limit Detector) sul Filtro 1 in modalità interrupt
-    status = HAL_MDF_OldStop_IT(&MdfHandle1, &mdfOldConfig1);
+    status = HAL_MDF_OldStop_IT(&MdfHandle1);
     if (status != HAL_OK)
     {
         printf("ERROR: MDF OldStop_IT failed! Status: %d\r\n", status);
@@ -96,6 +96,14 @@ float Calculate_dB(int32_t *buffer, uint16_t size)
  */
 void start_continuous_acquisition(void){
 
+    MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
+    mdfDmaConfig0.Address    = (uint32_t)&audio_buffer_acq[0];
+    mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_acq[0]);
+    mdfDmaConfig0.MsbOnly    = DISABLE;
+
+    // Impostiamo l'acquisizione in modalità sincrona continua: il trigger di TIM1 avvia la conversione
+    // che prosegue ad alta frequenza fino al riempimento del buffer DMA (512 campioni).
+    MdfFilterConfig0.AcquisitionMode = MDF_MODE_SYNC_CONT;
 
     HAL_StatusTypeDef status = HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0);
     if (status != HAL_OK)
@@ -145,6 +153,7 @@ void stop_continuous_acquisition(void){
     }
    }
 
+/**
  * @brief Stampa la diagnostica dei picchi acustici per la fascia DIURNA.
  * Soglia minima di attenzione: 65 dBSPL (Traffico/Folla).
  */

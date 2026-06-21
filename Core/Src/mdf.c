@@ -203,7 +203,7 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     PeriphClkInit.PLL3.PLL3R = 2;
     PeriphClkInit.PLL3.PLL3RGE = RCC_PLLVCIRANGE_1;
     PeriphClkInit.PLL3.PLL3FRACN = 0;
-    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVP;
+    PeriphClkInit.PLL3.PLL3ClockOut = RCC_PLL3_DIVP | RCC_PLL3_DIVQ;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
     {
       Error_Handler();
@@ -248,7 +248,7 @@ void HAL_MDF_MspInit(MDF_HandleTypeDef* mdfHandle)
     handle_GPDMA1_Channel0.Init.BlkHWRequest = DMA_BREQ_SINGLE_BURST;
     handle_GPDMA1_Channel0.Init.Direction = DMA_PERIPH_TO_MEMORY;
     handle_GPDMA1_Channel0.Init.SrcInc = DMA_SINC_FIXED;
-    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_FIXED;
+    handle_GPDMA1_Channel0.Init.DestInc = DMA_DINC_INCREMENTED;
     handle_GPDMA1_Channel0.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_WORD;
     handle_GPDMA1_Channel0.Init.DestDataWidth = DMA_DEST_DATAWIDTH_WORD;
     handle_GPDMA1_Channel0.Init.Priority = DMA_LOW_PRIORITY_LOW_WEIGHT;

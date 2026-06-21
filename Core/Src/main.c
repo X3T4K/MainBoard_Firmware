@@ -419,9 +419,9 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 					pagina_scritta = 0;
 				}
 				// Set up session boundary pointers
-				session_start_block = a_scritta;
-				session_active = 0;b;
-				session_start_page = pagin
+				session_start_block = b;
+				session_start_page = pagina_scritta;
+				session_active = 0;
 				global_sample_count = 0;
 
 				current_state = STATE_ACQUISITION;
@@ -436,6 +436,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 				spi_nand_block_erase(erase_addr);
       
 				start_continuous_acquisition(); // Start continuous acquisition for periodic monitoring
+				HAL_TIM_Base_Start_IT(&htim2); // Start the timer for periodic printing of DMA status
 				LED_On(LED_GREEN); // Provide visual feedback for starting acquisition
 			break;
 			case STATE_ACQUISITION:
@@ -443,6 +444,7 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
         button_force_stop = 1; // Set a flag to say that the acquisition has been interrupted
 				current_state = STATE_IDLE;
 				stop_continuous_acquisition(); // Stop the continuous acquisition
+				HAL_TIM_Base_Stop_IT(&htim2); // Stop the timer
 
 				LED_Off(LED_GREEN); // Turn off the LED
         printf("Data acquisition stopped by user.\n");
@@ -572,7 +574,31 @@ void HAL_MDF_AcqCpltCallback(MDF_HandleTypeDef *hmdf)
     
 
       write_memory(); // Salva su NAND Flash
+
+      // Riarmare il DMA per il prossimo trigger hardware di TIM1
+      MDF_DmaConfigTypeDef mdfDmaConfig0 = {0};
+      mdfDmaConfig0.Address    = (uint32_t)&audio_buffer_acq[0];
+      mdfDmaConfig0.DataLength = AUDIO_SAMPLES * sizeof(audio_buffer_acq[0]);
+      mdfDmaConfig0.MsbOnly    = DISABLE;
+      HAL_MDF_AcqStart_DMA(&MdfHandle0, &MdfFilterConfig0, &mdfDmaConfig0);
     }    
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim->Instance == TIM2)
+  {
+    if (current_state == STATE_ACQUISITION)
+    {
+      printf("[DMA DEBUG] State=%d, Error=0x%08lx, RemainingBytes=%ld, CSR=0x%08lx, CSAR=0x%08lx, CDAR=0x%08lx\r\n",
+             (int)handle_GPDMA1_Channel0.State,
+             (unsigned long)handle_GPDMA1_Channel0.ErrorCode,
+             (long)(GPDMA1_Channel0->CBR1 & 0x3FFFF),
+             (unsigned long)GPDMA1_Channel0->CSR,
+             (unsigned long)GPDMA1_Channel0->CSAR,
+             (unsigned long)GPDMA1_Channel0->CDAR);
+    }
+  }
 }
 
 /* USER CODE END 4 */
